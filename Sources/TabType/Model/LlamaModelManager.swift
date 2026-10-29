@@ -1,8 +1,10 @@
+import Combine
 import Foundation
 import TabTypeKit
 
-/// Owns the v2 (llama.cpp) model lifecycle: the catalog, which model is selected,
-/// downloads, and loading it into the shared `InferenceEngine`.
+/// The bundled catalog and model files in Keyweave's namespace. Gate0 startup
+/// and Settings getters are passive; explicit user model-management actions
+/// retain their existing implementation.
 @MainActor
 final class LlamaModelManager: ObservableObject {
     static let shared = LlamaModelManager()
@@ -20,11 +22,12 @@ final class LlamaModelManager: ObservableObject {
     /// Bumped whenever files on disk change, so views re-check installed state.
     @Published private(set) var storageRevision = 0
     @Published var selectedID: String {
-        didSet { UserDefaults.standard.set(selectedID, forKey: Self.selectedKey) }
+        didSet { defaults.set(selectedID, forKey: Self.selectedKey) }
     }
+    private let defaults: UserDefaults
     let inference = InferenceEngine()
-    let store = TabTypeKit.ModelStore()
-    let ramGB = Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824)
+    let store: TabTypeKit.ModelStore
+    let ramGB: Int
 
     /// Template and decoder settings of the loaded model (nil until loaded).
     private(set) var template: ModelTemplate?
@@ -35,17 +38,25 @@ final class LlamaModelManager: ObservableObject {
     private static let selectedKey = "llamaModelID"
     private static let customPrefix = "custom:"
 
-    private init() {
-        catalog = (try? TabTypeKit.ModelCatalog.bundled())
+    init(defaults: UserDefaults = AppPreferences.current,
+         store: TabTypeKit.ModelStore = TabTypeKit.ModelStore(),
+         ramGB: Int = Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824)) {
+        self.defaults = defaults
+        self.store = store
+        self.ramGB = ramGB
+        let bundled = (try? TabTypeKit.ModelCatalog.bundled())
             ?? TabTypeKit.ModelCatalog(version: 0, models: [], recommendations: [])
-        selectedID = UserDefaults.standard.string(forKey: Self.selectedKey) ?? ""
-        if selectedID.isEmpty { selectedID = recommendedID ?? catalog.models.first?.id ?? "" }
+        catalog = bundled
+        let saved = defaults.string(forKey: Self.selectedKey) ?? ""
+        selectedID = saved.isEmpty
+            ? (bundled.recommendedEntry(forRAMGB: ramGB)?.id ?? bundled.models.first?.id ?? "")
+            : saved
     }
 
     var isLoaded: Bool { if case .ready = status { return true } else { return false } }
     var recommendedID: String? { catalog.recommendedEntry(forRAMGB: ramGB)?.id }
 
-    /// Catalog models offered on this Mac, plus GGUFs the user dropped into the folder.
+    /// Reading Settings must not create the model directory or load a model.
     var entries: [TabTypeKit.ModelCatalog.Entry] {
         _ = storageRevision
         return catalog.entries(forRAMGB: ramGB) + customEntries()
@@ -57,7 +68,6 @@ final class LlamaModelManager: ObservableObject {
 
     func isInstalled(_ id: String) -> Bool {
         _ = storageRevision
-        if id.hasPrefix(Self.customPrefix) { return true }
         return entry(id: id).map(store.isInstalled) ?? false
     }
 
@@ -69,31 +79,9 @@ final class LlamaModelManager: ObservableObject {
 
     // MARK: Lifecycle
 
-    /// Refresh the catalog and load the selected model if it's on disk.
-    func start() {
-        Task {
-            let cache = store.directory.appendingPathComponent("catalog-cache.json")
-            try? FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
-            catalog = await TabTypeKit.ModelCatalog.latest(cacheURL: cache)
-            storageRevision += 1
-        }
-        let onBattery = PowerMonitor.shared.onBattery && AppSettings.shared.batterySmallerModel
-        let initial = onBattery ? (batteryModelID() ?? selectedID) : selectedID
-        PowerMonitor.shared.onBatteryChange = { [weak self] on in
-            self?.applyPower(onBattery: on, useSmallerModel: AppSettings.shared.batterySmallerModel)
-        }
-        if isInstalled(initial) {
-            load(initial)
-        } else if let entry = entry(id: selectedID), !selectedID.hasPrefix(Self.customPrefix),
-                  FileManager.default.fileExists(atPath: store.url(for: entry).appendingPathExtension("part").path) {
-            // A download of the selected model was interrupted (quit, crash,
-            // relaunch): pick it up where it stopped.
-            Log.shared.info("v2 engine: resuming the interrupted download of \(selectedID)")
-            download(selectedID)
-        } else if case .noModel = status {
-            Log.shared.info("v2 engine: selected model \(selectedID) is not downloaded yet")
-        }
-    }
+    /// Gate0 startup is passive: no directory creation, catalog refresh, power
+    /// subscription, automatic model load or interrupted-download resume.
+    func start() {}
 
     /// Choose a model: load it if present, otherwise download then load.
     func select(_ id: String) {
@@ -162,7 +150,6 @@ final class LlamaModelManager: ObservableObject {
                 loadedID = id
                 status = .ready(id: id)
                 Log.shared.info("v2 engine: loaded \(entry.name) (\(entry.template)) in \(Int(Date().timeIntervalSince(start) * 1000))ms — show bar \(decoderOptions?.showThreshold ?? 0), extend bar \(decoderOptions?.extensionThreshold ?? 0), catalog v\(catalog.version)")
-                await selfTest(entry)
             } catch {
                 status = .failed(id: id, message: "Couldn't load \(entry.name): \(error)")
                 Log.shared.info("v2 engine: load of \(id) failed: \(error)")
@@ -195,22 +182,6 @@ final class LlamaModelManager: ObservableObject {
     }
 
     // MARK: Helpers
-
-    /// One fixed completion right after loading, logged — proves the whole v2 path
-    /// (template → decoder → Metal) works on this Mac before the first keystroke.
-    private func selfTest(_ entry: TabTypeKit.ModelCatalog.Entry) async {
-        let text = PromptAssembler(template: entry.modelTemplate)
-            .assemble(PromptContext(typedText: "Thanks for the update, I'll take a look "))
-        let start = Date()
-        let result = try? await inference.complete(text, options: entry.decoderOptions(),
-                                                    requestID: inference.beginRequest())
-        let ms = Int(Date().timeIntervalSince(start) * 1000)
-        if let result {
-            Log.shared.info("v2 self-test: \"…take a look \" → \"\(result.text)\" (conf \(String(format: "%.2f", result.confidence)), \(ms)ms)")
-        } else {
-            Log.shared.info("v2 self-test: no result (\(ms)ms)")
-        }
-    }
 
     private func restoreStatus() {
         if let loadedID { status = .ready(id: loadedID) } else { status = .noModel }
