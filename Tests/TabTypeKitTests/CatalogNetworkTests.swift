@@ -11,7 +11,7 @@ final class CatalogRefreshTests: XCTestCase {
         XCTAssertEqual(catalog, try ModelCatalog.bundled())
     }
 
-    func testUnreachableRemoteUsesNewerCachedCopy() async throws {
+    func testNewerCachedCopyCannotReplaceBundledCatalog() async throws {
         var newer = try ModelCatalog.bundled()
         newer.version += 1
         newer.recommendations = [.init(minimumRAMGB: 8, modelID: newer.models[0].id)]
@@ -19,7 +19,7 @@ final class CatalogRefreshTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: cache) }
         try JSONEncoder().encode(newer).write(to: cache)
         let catalog = await ModelCatalog.latest(remote: URL(string: "http://127.0.0.1:9/models.json")!, cacheURL: cache)
-        XCTAssertEqual(catalog, newer)
+        XCTAssertEqual(catalog, try ModelCatalog.bundled())
     }
 
     func testOlderCachedCopyIsIgnored() async throws {

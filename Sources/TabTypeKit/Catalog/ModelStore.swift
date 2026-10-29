@@ -2,14 +2,12 @@ import CryptoKit
 import Foundation
 
 /// Where model files live and what's installed.
-/// Default: ~/Library/Application Support/TabType/Models
+/// Default: Keyweave's model directory. Construction and getters are read-only.
 public struct ModelStore: Sendable {
     public let directory: URL
 
-    public init(directory: URL? = nil) {
-        self.directory = directory ?? FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("TabType/Models", isDirectory: true)
+    public init(directory: URL? = nil, paths: AppPaths = .current) {
+        self.directory = directory ?? paths.modelsDirectory
     }
 
     public func url(for entry: ModelCatalog.Entry) -> URL {

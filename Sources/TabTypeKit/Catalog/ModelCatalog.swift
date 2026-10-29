@@ -1,8 +1,7 @@
 import Foundation
 
 /// The list of models TabType can download, which one to recommend for a Mac, and
-/// each model's tuned decoding settings. Shipped inside the app and refreshable
-/// from the repo (`catalog/models.json`).
+/// each model's tuned decoding settings. Gate0 uses only the bundled catalog.
 public struct ModelCatalog: Codable, Sendable, Equatable {
     public struct Entry: Codable, Sendable, Equatable {
         public var id: String
@@ -94,31 +93,11 @@ public struct ModelCatalog: Codable, Sendable, Equatable {
         try JSONDecoder().decode(ModelCatalog.self, from: data)
     }
 
-    /// Where the newest catalog is published: this repo's `main` branch, so new
-    /// models and retuned thresholds reach users without an app release.
-    public static let remoteURL = URL(string:
-        "https://raw.githubusercontent.com/nilava/TabType/main/Sources/TabTypeKit/Catalog/models.json")!
-
-    /// The freshest usable catalog: remote (cached to `cacheURL` on success), else the
-    /// last cached copy, else the bundled one. Only a STRICTLY newer remote or
-    /// cached catalog replaces the bundled one — an equal version from `main`
-    /// would silently undo this build's tuning. Undecodable ones are ignored.
-    public static func latest(remote: URL = remoteURL, cacheURL: URL?,
-                              session: URLSession = .shared) async -> ModelCatalog {
-        let bundled = (try? bundled()) ?? ModelCatalog(version: 0, models: [], recommendations: [])
-        var request = URLRequest(url: remote, timeoutInterval: 10)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        if let (data, response) = try? await session.data(for: request),
-           (response as? HTTPURLResponse)?.statusCode == 200,
-           let fetched = try? decode(data), fetched.version > bundled.version, !fetched.models.isEmpty {
-            if let cacheURL { try? data.write(to: cacheURL, options: .atomic) }
-            return fetched
-        }
-        if let cacheURL, let data = try? Data(contentsOf: cacheURL), let cached = try? decode(data),
-           cached.version > bundled.version, !cached.models.isEmpty {
-            return cached
-        }
-        return bundled
+    /// Compatibility entry point. Gate0 never reads a remote or cached catalog,
+    /// writes a cache, or issues a request, including for direct API callers.
+    public static func latest(remote: URL? = nil, cacheURL: URL?,
+                              session: URLSession? = nil) async -> ModelCatalog {
+        (try? bundled()) ?? ModelCatalog(version: 0, models: [], recommendations: [])
     }
 
     /// The catalog shipped with this build.
