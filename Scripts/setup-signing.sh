@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time setup: create a self-signed code-signing certificate named "TabType Dev"
+# One-time setup: create a self-signed code-signing certificate named "Keyweave Dev"
 # in your login keychain. Signing with a STABLE identity (instead of ad-hoc) means
 # macOS remembers your Accessibility and Screen Recording grants across rebuilds.
 #
@@ -7,7 +7,7 @@
 # Signing in Keychain Access), then build with ./Scripts/build.sh app.
 set -euo pipefail
 
-IDENTITY="TabType Dev"
+IDENTITY="${SIGN_IDENTITY:-Keyweave Dev}"
 
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
     echo "✓ Code-signing identity \"$IDENTITY\" already exists. Nothing to do."
@@ -26,11 +26,11 @@ openssl req -x509 -newkey rsa:2048 -days 3650 \
 
 openssl pkcs12 -export -legacy \
     -in "$TMP/dev.crt" -inkey "$TMP/dev.key" \
-    -out "$TMP/dev.p12" -password pass:tabtype >/dev/null 2>&1
+    -out "$TMP/dev.p12" -password pass:keyweave >/dev/null 2>&1
 
 security import "$TMP/dev.p12" \
     -k "$HOME/Library/Keychains/login.keychain-db" \
-    -P tabtype -T /usr/bin/codesign
+    -P keyweave -T /usr/bin/codesign
 
 echo ""
 echo "✓ Certificate imported into your login keychain."
