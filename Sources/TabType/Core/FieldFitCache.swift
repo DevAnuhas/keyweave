@@ -31,14 +31,23 @@ final class FieldFitCache {
 
     private var fits: [String: Fit] = [:]
     private var inFlight: Set<String> = []
+    private let paths: AppPaths
+    private let screenCaptureAllowed: () -> Bool
+
+    init(paths: AppPaths = .current,
+         screenCaptureAllowed: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
+        self.paths = paths
+        self.screenCaptureAllowed = screenCaptureAllowed
+    }
 
     /// Cached or freshly measured fit for the field at `caret`. nil when the text
     /// can't be measured (no screen permission, too little text, low confidence).
     /// `knownSize`: the size the app reported over AX — only the family is fitted.
     func fit(caret: CGRect, fieldFrame: CGRect?, key: String, lineText: String, verbose: Bool,
              knownSize: CGFloat? = nil) async -> Fit? {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
         if let cached = fits[key], Date().timeIntervalSince(cached.created) < 600 { return cached }
-        guard !inFlight.contains(key), CGPreflightScreenCaptureAccess() else { return nil }
+        guard !inFlight.contains(key), screenCaptureAllowed() else { return nil }
         let line = String(lineText.split(separator: "\n", omittingEmptySubsequences: false).last ?? "")
         guard line.trimmingCharacters(in: .whitespaces).count >= 6 else { return nil }
         inFlight.insert(key)
@@ -70,7 +79,7 @@ final class FieldFitCache {
                                   knownSize: knownSize.map(Double.init))
         }.value
         let ms = Int(Date().timeIntervalSince(start) * 1000)
-        if verbose { Self.dump(image, key: key) }
+        if verbose { dump(image, key: key) }
 
         guard let result else {
             Log.shared.debug("placement: fit gave no result (\(ms)ms)")
@@ -91,6 +100,7 @@ final class FieldFitCache {
 
     /// The cached fit, if fresh — no measuring.
     func cached(key: String) -> Fit? {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
         guard let fit = fits[key], Date().timeIntervalSince(fit.created) < 600 else { return nil }
         return fit
     }
@@ -108,8 +118,9 @@ final class FieldFitCache {
     }
 
     /// Verbose mode: keep the captured strips for diagnosing placement.
-    private static func dump(_ image: CGImage, key: String) {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/TabType/fit")
+    private func dump(_ image: CGImage, key: String) {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return }
+        let dir = paths.fitCapturesDirectory
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let name = "\(Int(Date().timeIntervalSince1970))-\(abs(key.hashValue) % 100_000).png"
         guard let dest = CGImageDestinationCreateWithURL(dir.appendingPathComponent(name) as CFURL,

@@ -6,17 +6,19 @@ final class EmojiUsageStore {
     static let shared = EmojiUsageStore()
     private let key = "emojiRecents"
     private let maxRecents = 24
+    private let defaults: UserDefaults
 
     private(set) var recentCodes: [String]
 
-    private init() {
-        recentCodes = UserDefaults.standard.stringArray(forKey: key) ?? []
+    init(defaults: UserDefaults = AppPreferences.current) {
+        self.defaults = defaults
+        recentCodes = defaults.stringArray(forKey: key) ?? []
     }
 
     func record(_ code: String) {
         recentCodes.removeAll { $0 == code }
         recentCodes.insert(code, at: 0)
         if recentCodes.count > maxRecents { recentCodes.removeLast(recentCodes.count - maxRecents) }
-        UserDefaults.standard.set(recentCodes, forKey: key)
+        defaults.set(recentCodes, forKey: key)
     }
 }

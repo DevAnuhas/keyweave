@@ -13,7 +13,7 @@ final class AppSettings: ObservableObject {
 
     static let shared = AppSettings()
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
     // MARK: General
     @Published var isEnabled: Bool { didSet { defaults.set(isEnabled, forKey: Keys.isEnabled) } }
@@ -71,11 +71,35 @@ final class AppSettings: ObservableObject {
     /// assembler budgets them further).
     static let inputContextChars = 2000
     /// Read the surrounding on-screen conversation (chat transcripts) as context.
-    @Published var useScreenContext: Bool { didSet { defaults.set(useScreenContext, forKey: Keys.useScreenContext) } }
+    @Published var useScreenContext: Bool {
+        didSet {
+            if !AppSafetyPolicy.screenContextEnabled && useScreenContext {
+                useScreenContext = false
+                return
+            }
+            defaults.set(useScreenContext, forKey: Keys.useScreenContext)
+        }
+    }
     /// Use the clipboard contents as additional context (opt-in; may be sensitive).
-    @Published var useClipboardContext: Bool { didSet { defaults.set(useClipboardContext, forKey: Keys.useClipboardContext) } }
+    @Published var useClipboardContext: Bool {
+        didSet {
+            if !AppSafetyPolicy.clipboardContextEnabled && useClipboardContext {
+                useClipboardContext = false
+                return
+            }
+            defaults.set(useClipboardContext, forKey: Keys.useClipboardContext)
+        }
+    }
     /// Sample the caret area to match ghost-text colour to the field (screenshot-assisted).
-    @Published var useScreenshotAppearance: Bool { didSet { defaults.set(useScreenshotAppearance, forKey: Keys.useScreenshotAppearance) } }
+    @Published var useScreenshotAppearance: Bool {
+        didSet {
+            if !AppSafetyPolicy.screenshotAppearanceEnabled && useScreenshotAppearance {
+                useScreenshotAppearance = false
+                return
+            }
+            defaults.set(useScreenshotAppearance, forKey: Keys.useScreenshotAppearance)
+        }
+    }
     /// One-time hint flags.
     var didShowGoogleDocsHint: Bool {
         get { defaults.bool(forKey: Keys.didShowGoogleDocsHint) }
@@ -127,7 +151,13 @@ final class AppSettings: ObservableObject {
     }
     /// Also learn from text written without accepting any suggestion.
     @Published var recordWithoutAccepts: Bool {
-        didSet { defaults.set(recordWithoutAccepts, forKey: Keys.recordWithoutAccepts) }
+        didSet {
+            if !AppSafetyPolicy.writingEnabled && recordWithoutAccepts {
+                recordWithoutAccepts = false
+                return
+            }
+            defaults.set(recordWithoutAccepts, forKey: Keys.recordWithoutAccepts)
+        }
     }
     /// Log-space bonus for the author's own continuation, and the factor on the
     /// show bar for a phrase they've used repeatedly.
@@ -139,7 +169,13 @@ final class AppSettings: ObservableObject {
         }
     }
     @Published var collectTypingHistory: Bool {
-        didSet { defaults.set(collectTypingHistory, forKey: Keys.collectTypingHistory) }
+        didSet {
+            if !AppSafetyPolicy.writingEnabled && collectTypingHistory {
+                collectTypingHistory = false
+                return
+            }
+            defaults.set(collectTypingHistory, forKey: Keys.collectTypingHistory)
+        }
     }
 
     /// Browser domains where suggestions are disabled (bare hosts, e.g. "mail.google.com").
@@ -165,7 +201,8 @@ final class AppSettings: ObservableObject {
 
     // MARK: Apps (per-app enable/disable by bundle identifier)
 
-    private init() {
+    init(defaults: UserDefaults = AppPreferences.current) {
+        self.defaults = defaults
         isEnabled = defaults.object(forKey: Keys.isEnabled) as? Bool ?? true
         // The length setting is the source of truth (older builds stored 8 here).
         maxWords = AppSettings.words(for: defaults.string(forKey: Keys.completionLength) ?? "medium")
@@ -173,13 +210,11 @@ final class AppSettings: ObservableObject {
         batteryOnDemandOnly = defaults.object(forKey: Keys.batteryOnDemandOnly) as? Bool ?? false
         batteryShorterCompletions = defaults.object(forKey: Keys.batteryShorterCompletions) as? Bool ?? false
         batterySmallerModel = defaults.object(forKey: Keys.batterySmallerModel) as? Bool ?? false
-        // Settings that only the removed v1 (MLX / Apple Intelligence) engine used.
-        for key in Keys.retiredV1 { defaults.removeObject(forKey: key) }
         // Default OFF: OCR of the focused window repeatedly bled unrelated on-screen
         // text (plans, docs, code) into suggestions. Opt-in for those who want it.
-        useScreenContext = defaults.object(forKey: Keys.useScreenContext) as? Bool ?? false
-        useClipboardContext = defaults.object(forKey: Keys.useClipboardContext) as? Bool ?? false
-        useScreenshotAppearance = defaults.object(forKey: Keys.useScreenshotAppearance) as? Bool ?? true
+        useScreenContext = AppSafetyPolicy.screenContextEnabled && (defaults.object(forKey: Keys.useScreenContext) as? Bool ?? false)
+        useClipboardContext = AppSafetyPolicy.clipboardContextEnabled && (defaults.object(forKey: Keys.useClipboardContext) as? Bool ?? false)
+        useScreenshotAppearance = AppSafetyPolicy.screenshotAppearanceEnabled && (defaults.object(forKey: Keys.useScreenshotAppearance) as? Bool ?? false)
         showMenuBarIcon = defaults.object(forKey: Keys.showMenuBarIcon) as? Bool ?? true
         showAccessoryButton = defaults.object(forKey: Keys.showAccessoryButton) as? Bool ?? false
         disableMacOSPredictiveText = defaults.object(forKey: Keys.disableMacOSPredictiveText) as? Bool ?? false
@@ -189,12 +224,12 @@ final class AppSettings: ObservableObject {
         authorName = defaults.string(forKey: Keys.authorName) ?? NSFullUserName()
         writingStyle = defaults.string(forKey: Keys.writingStyle) ?? ""
         customInstructions = defaults.string(forKey: Keys.customInstructions) ?? ""
-        collectTypingHistory = defaults.object(forKey: Keys.collectTypingHistory) as? Bool ?? false
+        collectTypingHistory = AppSafetyPolicy.writingEnabled && (defaults.object(forKey: Keys.collectTypingHistory) as? Bool ?? false)
         personalizationStrength = defaults.string(forKey: Keys.personalizationStrength) ?? "balanced"
         alternativesAfterDelay = defaults.object(forKey: Keys.alternativesAfterDelay) as? Bool ?? false
         synonymsAfterDelay = defaults.object(forKey: Keys.synonymsAfterDelay) as? Bool ?? false
         labsDelay = defaults.object(forKey: Keys.labsDelay) as? Double ?? 1.5
-        recordWithoutAccepts = defaults.object(forKey: Keys.recordWithoutAccepts) as? Bool ?? true
+        recordWithoutAccepts = AppSafetyPolicy.writingEnabled && (defaults.object(forKey: Keys.recordWithoutAccepts) as? Bool ?? false)
         disabledDomains = Set(defaults.stringArray(forKey: Keys.disabledDomains) ?? [])
         if let data = defaults.data(forKey: Keys.appOverrides),
            let decoded = try? JSONDecoder().decode([String: AppOverride].self, from: data) {
@@ -218,13 +253,13 @@ final class AppSettings: ObservableObject {
         let sysLang = Locale.current.language.languageCode?.identifier ?? "en"
         autocorrectLanguage = defaults.string(forKey: Keys.autocorrectLanguage)
             ?? (SpellChecker.supported.contains(sysLang) ? sysLang : "en")
-        acceptWordKey = AppSettings.loadBinding(Keys.acceptWordKey, default: .tab)
-        acceptAllKey = AppSettings.loadBinding(Keys.acceptAllKey, default: .shiftTab)
-        dismissKey = AppSettings.loadBinding(Keys.dismissKey, default: .escape)
-        toggleKey = AppSettings.loadBinding(Keys.toggleKey, default: .unset)
-        forceActivateKey = AppSettings.loadBinding(Keys.forceActivateKey, default: .controlBacktick)
-        appPauseKey = AppSettings.loadBinding(Keys.appPauseKey, default: .controlOptionCommandP)
-        wordAlternativesKey = AppSettings.loadBinding(Keys.wordAlternativesKey, default: .controlOptionSpace)
+        acceptWordKey = AppSettings.loadBinding(Keys.acceptWordKey, default: .tab, defaults: defaults)
+        acceptAllKey = AppSettings.loadBinding(Keys.acceptAllKey, default: .shiftTab, defaults: defaults)
+        dismissKey = AppSettings.loadBinding(Keys.dismissKey, default: .escape, defaults: defaults)
+        toggleKey = AppSettings.loadBinding(Keys.toggleKey, default: .unset, defaults: defaults)
+        forceActivateKey = AppSettings.loadBinding(Keys.forceActivateKey, default: .controlBacktick, defaults: defaults)
+        appPauseKey = AppSettings.loadBinding(Keys.appPauseKey, default: .controlOptionCommandP, defaults: defaults)
+        wordAlternativesKey = AppSettings.loadBinding(Keys.wordAlternativesKey, default: .controlOptionSpace, defaults: defaults)
 
         Log.shared.verbose = verboseLog
         AppPolicyStore.userOverrides = appOverrides
@@ -233,8 +268,8 @@ final class AppSettings: ObservableObject {
     private func saveBinding(_ b: KeyBinding, _ key: String) {
         if let data = try? JSONEncoder().encode(b) { defaults.set(data, forKey: key) }
     }
-    private static func loadBinding(_ key: String, default def: KeyBinding) -> KeyBinding {
-        guard let data = UserDefaults.standard.data(forKey: key),
+    private static func loadBinding(_ key: String, default def: KeyBinding, defaults: UserDefaults) -> KeyBinding {
+        guard let data = defaults.data(forKey: key),
               let b = try? JSONDecoder().decode(KeyBinding.self, from: data) else { return def }
         return b
     }
@@ -247,12 +282,6 @@ final class AppSettings: ObservableObject {
     private enum Keys {
         static let isEnabled = "isEnabled"
         static let maxWords = "maxWords"
-        /// Keys of settings that only the removed v1 engine used — deleted on launch.
-        static let retiredV1 = ["maxTokens", "engineChoice", "migratedToLlamaEngine", "modelId", "temperature",
-                                "storeInputsWithoutAcceptedCompletions", "personalizeWordChoice",
-                                // Tuning knobs removed in v2.1 (they only got in the way).
-                                "debounceMs", "continuousGeneration", "contextChars", "screenCropMode",
-                                "textMirroring", "batteryUseDebounce", "llamaAdapter", "acceptWholeLine"]
         static let ghostOpacity = "ghostOpacity"
         static let batteryOnDemandOnly = "batteryOnDemandOnly"
         static let batteryShorterCompletions = "batteryShorterCompletions"

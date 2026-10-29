@@ -57,14 +57,16 @@ extension AppSettings {
         escapeBehavior = s.escapeBehavior; autocorrectLanguage = s.autocorrectLanguage
         batteryOnDemandOnly = s.batteryOnDemandOnly; batteryShorterCompletions = s.batteryShorterCompletions
         batterySmallerModel = s.batterySmallerModel
-        useScreenContext = s.useScreenContext; useClipboardContext = s.useClipboardContext
-        useScreenshotAppearance = s.useScreenshotAppearance
+        useScreenContext = AppSafetyPolicy.screenContextEnabled && s.useScreenContext
+        useClipboardContext = AppSafetyPolicy.clipboardContextEnabled && s.useClipboardContext
+        useScreenshotAppearance = AppSafetyPolicy.screenshotAppearanceEnabled && s.useScreenshotAppearance
         completionLength = s.completionLength; authorName = s.authorName; writingStyle = s.writingStyle
         customInstructions = s.customInstructions
         alternativesAfterDelay = s.alternativesAfterDelay; synonymsAfterDelay = s.synonymsAfterDelay
         labsDelay = s.labsDelay
         personalizationStrength = s.personalizationStrength
-        recordWithoutAccepts = s.recordWithoutAccepts; collectTypingHistory = s.collectTypingHistory
+        recordWithoutAccepts = AppSafetyPolicy.writingEnabled && s.recordWithoutAccepts
+        collectTypingHistory = AppSafetyPolicy.writingEnabled && s.collectTypingHistory
         disabledDomains = s.disabledDomains; appOverrides = s.appOverrides
     }
 }

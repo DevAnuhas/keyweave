@@ -3,11 +3,12 @@ import CommonCrypto
 import CryptoKit
 import Foundation
 import Security
+import TabTypeKit
 
 /// Sync between Macs through iCloud Drive, end-to-end encrypted (Cotypist syncs
 /// over iCloud too; CloudKit needs a paid developer account, iCloud Drive
 /// doesn't). Each Mac writes one AES-GCM-sealed file to
-/// iCloud Drive/TabType Sync/ with its settings and learned writing; the key is
+/// iCloud Drive/Keyweave Sync/ with its settings and learned writing; the key is
 /// derived from a passphrase the user sets on every Mac, so Apple only ever
 /// stores ciphertext. Merge: the newest settings win; writing is combined.
 @MainActor
@@ -17,8 +18,9 @@ final class SyncManager: ObservableObject {
     @Published private(set) var status = ""
     @Published private(set) var otherMacs = 0
 
-    private let defaults = UserDefaults.standard
-    private let settings = AppSettings.shared
+    private let defaults: UserDefaults
+    private let injectedSettings: AppSettings?
+    private var settings: AppSettings { injectedSettings ?? AppSettings.shared }
     private var settingsWatch: AnyCancellable?
     private var timer: Timer?
     private var pendingSync: DispatchWorkItem?
@@ -27,28 +29,34 @@ final class SyncManager: ObservableObject {
     private static let enabledKey = "syncEnabled"
     private static let machineKey = "syncMachineID"
     private static let settingsChangedKey = "syncSettingsChangedAt"
-    private static let keychainService = "app.tabtype.sync"
+    private let paths: AppPaths
+    private let system: SyncSystemBoundary
 
     var enabled: Bool {
-        get { defaults.bool(forKey: Self.enabledKey) }
+        get { AppSafetyPolicy.syncEnabled && defaults.bool(forKey: Self.enabledKey) }
         set {
+            guard AppSafetyPolicy.syncEnabled else { return }
             defaults.set(newValue, forKey: Self.enabledKey)
             objectWillChange.send()
             if newValue { start() } else { stop(); status = "" }
         }
     }
 
-    var hasPassphrase: Bool { Self.readPassphrase() != nil }
+    var hasPassphrase: Bool {
+        guard AppSafetyPolicy.syncEnabled else { return false }
+        return system.readPassphrase(ProductIdentity.keychainService) != nil
+    }
 
-    /// iCloud Drive's folder for TabType (nil when iCloud Drive is off).
+    /// iCloud Drive's folder for Keyweave (nil while sync is unavailable).
     var folder: URL? {
-        let drive = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: drive.path) else { return nil }
-        return drive.appendingPathComponent("TabType Sync", isDirectory: true)
+        guard AppSafetyPolicy.syncEnabled else { return nil }
+        let drive = paths.syncDirectory.deletingLastPathComponent()
+        guard system.cloudDriveExists(drive) else { return nil }
+        return paths.syncDirectory
     }
 
     private var machineID: String {
+        guard AppSafetyPolicy.syncEnabled else { return "" }
         if let id = defaults.string(forKey: Self.machineKey) { return id }
         let id = UUID().uuidString
         defaults.set(id, forKey: Self.machineKey)
@@ -60,10 +68,16 @@ final class SyncManager: ObservableObject {
         set { defaults.set(newValue, forKey: Self.settingsChangedKey) }
     }
 
-    private init() {}
+    init(defaults: UserDefaults = AppPreferences.current, settings: AppSettings? = nil,
+         paths: AppPaths = .current, system: SyncSystemBoundary = .live) {
+        self.defaults = defaults
+        injectedSettings = settings
+        self.paths = paths
+        self.system = system
+    }
 
     func start() {
-        guard enabled else { return }
+        guard AppSafetyPolicy.syncEnabled, enabled else { return }
         settingsWatch = settings.objectWillChange.sink { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, !self.applyingRemote else { return }
@@ -83,17 +97,22 @@ final class SyncManager: ObservableObject {
         settingsWatch = nil
         timer?.invalidate()
         timer = nil
+        pendingSync?.cancel()
+        pendingSync = nil
+        guard AppSafetyPolicy.syncEnabled else { return }
         WritingStore.shared.onSyncNeeded = nil
     }
 
     func setPassphrase(_ passphrase: String) {
+        guard AppSafetyPolicy.syncEnabled else { return }
         guard passphrase.count >= 8 else { status = "Use at least 8 characters"; return }
-        Self.storePassphrase(passphrase)
+        system.storePassphrase(ProductIdentity.keychainService, passphrase)
         objectWillChange.send()
         syncNow()
     }
 
     private func scheduleSync(after delay: TimeInterval) {
+        guard AppSafetyPolicy.syncEnabled else { return }
         pendingSync?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.syncNow() }
         pendingSync = work
@@ -111,9 +130,9 @@ final class SyncManager: ObservableObject {
     }
 
     func syncNow() {
-        guard enabled else { return }
+        guard AppSafetyPolicy.syncEnabled, enabled else { return }
         guard let folder else { status = "Turn on iCloud Drive to sync"; return }
-        guard let passphrase = Self.readPassphrase() else { status = "Set a sync passphrase"; return }
+        guard let passphrase = system.readPassphrase(ProductIdentity.keychainService) else { status = "Set a sync passphrase"; return }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let key = try Self.key(passphrase: passphrase, salt: try Self.salt(in: folder))
@@ -122,7 +141,7 @@ final class SyncManager: ObservableObject {
             var others = 0
             var unreadable = 0
             for file in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-            where file.pathExtension == "tabtypesync" && file.deletingPathExtension().lastPathComponent != machineID {
+            where file.pathExtension == ProductIdentity.syncFileExtension && file.deletingPathExtension().lastPathComponent != machineID {
                 guard let sealed = try? Data(contentsOf: file),
                       let box = try? AES.GCM.SealedBox(combined: sealed),
                       let data = try? AES.GCM.open(box, using: key),
@@ -144,7 +163,7 @@ final class SyncManager: ObservableObject {
                                settingsChangedAt: settingsChangedAt, settings: settings.syncSnapshot,
                                writing: WritingStore.shared.allDocuments)
             let sealed = try AES.GCM.seal(try JSONEncoder().encode(mine), using: key).combined!
-            try sealed.write(to: folder.appendingPathComponent("\(machineID).tabtypesync"), options: .atomic)
+            try sealed.write(to: folder.appendingPathComponent("\(machineID).\(ProductIdentity.syncFileExtension)"), options: .atomic)
 
             otherMacs = others
             let time = Date().formatted(date: .omitted, time: .shortened)
@@ -183,18 +202,35 @@ final class SyncManager: ObservableObject {
         return SymmetricKey(data: derived)
     }
 
-    private static func readPassphrase() -> String? {
+}
+
+/// The system interfaces used by sync. Merely constructing this value does not
+/// inspect Keychain or iCloud; synthetic tests replace every closure.
+@MainActor
+struct SyncSystemBoundary {
+    var readPassphrase: @MainActor (String) -> String?
+    var storePassphrase: @MainActor (String, String) -> Void
+    var cloudDriveExists: @MainActor (URL) -> Bool
+
+    static let live = SyncSystemBoundary(
+        readPassphrase: readPassphrase,
+        storePassphrase: storePassphrase,
+        cloudDriveExists: { FileManager.default.fileExists(atPath: $0.path) })
+
+    private static func readPassphrase(service: String) -> String? {
+        guard AppSafetyPolicy.syncEnabled else { return nil }
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                    kSecAttrService as String: keychainService,
+                                    kSecAttrService as String: service,
                                     kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    private static func storePassphrase(_ passphrase: String) {
+    private static func storePassphrase(service: String, passphrase: String) {
+        guard AppSafetyPolicy.syncEnabled else { return }
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                   kSecAttrService as String: keychainService]
+                                   kSecAttrService as String: service]
         SecItemDelete(base as CFDictionary)
         var add = base
         add[kSecValueData as String] = Data(passphrase.utf8)
