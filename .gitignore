@@ -1,6 +1,7 @@
 # Build products
 .build/
 .build-xcode/
+.build-keyweave/
 .swiftpm/
 *.xcodeproj/xcuserdata/
 DerivedData/
