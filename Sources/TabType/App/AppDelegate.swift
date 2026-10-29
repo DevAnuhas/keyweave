@@ -12,20 +12,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private var statusItem: NSStatusItem!
     private let statusMenu = NSMenu()
-    private var settingsWindow: NSWindow?
+    private(set) var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
-    private var trustTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+
+    /// The startup platform boundary. It checks existing trust; it has no
+    /// operation for requesting permissions or starting forbidden services.
+    struct StartupOperations {
+        var accessibilityTrusted: () -> Bool
+        var startEngine: () -> Void
+    }
+
+    static func startEngineIfTrusted(operations: StartupOperations) {
+        guard AppSafetyPolicy.inputMonitoringEnabled else { return }
+        guard operations.accessibilityTrusted() else { return }
+        operations.startEngine()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
         startSecureInputWatch()
-        // Updates from GitHub Releases: at launch and then daily (Settings ▸ About).
-        Updater.shared.checkIfDue()
-        SyncManager.shared.start()   // no-op unless sync between Macs is on
-        Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
-            MainActor.assumeIsolated { Updater.shared.checkIfDue() }
-        }
 
         // Rebuild the menu whenever model state or enablement changes.
         settings.$isEnabled
@@ -48,52 +54,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             MainActor.assumeIsolated { self?.openSettings() }
         }
 
-        // Apply the "disable macOS predictive text" preference.
-        applyMacOSPredictiveText()
-        settings.$disableMacOSPredictiveText
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.applyMacOSPredictiveText() }
-            .store(in: &cancellables)
-
-        Log.shared.info("TabType launched. model=\(llamaModels.selectedID) ax=\(AccessibilityBridge.isTrusted()) screen=\(ScreenContextProvider.shared.hasPermission()) emoji=\(EmojiMatcher.shared.all.count)")
+        Log.shared.info("\(ProductIdentity.name) launched. model=\(llamaModels.selectedID) ax=\(AccessibilityBridge.isTrusted()) screen=\(ScreenContextProvider.shared.hasPermission()) emoji=\(EmojiMatcher.shared.all.count)")
 
         // Register bundled fonts so ghost text can match fields that use them.
         Log.shared.info("ghost fonts: \(BundledFonts.families.joined(separator: ", "))")
 
-        // The author's own writing (opt-in) → suffix index for personal phrasing.
-        WritingStore.shared.importPendingFile()   // before the index is built
-        PersonalIndex.shared.start()
-
-        // Start loading the model + spell dictionary right away.
-        llamaModels.start()
+        // Gate0 observes status without starting, loading or prewarming a model.
         llamaModels.$status
             .receive(on: RunLoop.main)
-            .sink { [weak self] status in
-                self?.rebuildMenu()
-                // Cache the static prompt head as soon as the model is ready.
-                if case .ready = status { self?.engine.warmUpModel() }
-            }
+            .sink { [weak self] _ in self?.rebuildMenu() }
             .store(in: &cancellables)
         // Autocorrect and the typo gate on suggestions both use it.
         SpellChecker.shared.loadIfNeeded(language: settings.autocorrectLanguage)
 
-        // Ask for Screen Recording up front if screen memory is on (non-blocking).
-        if settings.useScreenContext && !ScreenContextProvider.shared.hasPermission() {
-            ScreenContextProvider.shared.requestPermission()
-        }
-
-        // Confirm the capture+OCR pipeline works on this machine (logs the result).
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            ScreenContextProvider.shared.selfTest()
-        }
-
-        // Gate on Accessibility permission.
-        if AccessibilityBridge.isTrusted() {
-            _ = engine.start()
-        } else {
-            showOnboarding()
-            waitForTrustThenStart()
-        }
+        // Gate0 also blocks input monitoring when existing trust is reported.
+        // A terminal-launched process may inherit a responsible app's trust.
+        Self.startEngineIfTrusted(operations: .init(
+            accessibilityTrusted: { AccessibilityBridge.isTrusted() },
+            startEngine: { _ = self.engine.start() }))
     }
 
     /// The model must be freed before exit: ggml aborts if Metal resources are
@@ -111,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "TabType")
+            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: ProductIdentity.name)
             button.image?.isTemplate = true
         }
         statusItem.isVisible = settings.showMenuBarIcon
@@ -147,10 +125,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         menu.addItem(.separator())
 
         if engine.isPaused {
-            let resumeTitle = settings.isEnabled ? "Resume TabType" : "Enable TabType"
+            let resumeTitle = settings.isEnabled ? "Resume \(ProductIdentity.name)" : "Enable \(ProductIdentity.name)"
             menu.addItem(item(resumeTitle, icon: "play.circle", action: #selector(resumeNow)))
         } else {
-            let toggle = item(settings.isEnabled ? "Pause TabType" : "Enable TabType",
+            let toggle = item(settings.isEnabled ? "Pause \(ProductIdentity.name)" : "Enable \(ProductIdentity.name)",
                               icon: settings.isEnabled ? "pause.circle" : "power",
                               action: #selector(toggleEnabled))
             menu.addItem(toggle)
@@ -182,10 +160,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         menu.addItem(.separator())
         menu.addItem(item("Open Log", icon: "doc.text.magnifyingglass", action: #selector(openLog)))
-        menu.addItem(item("About TabType", icon: "info.circle", action: #selector(openAbout)))
+        menu.addItem(item("About \(ProductIdentity.name)", icon: "info.circle", action: #selector(openAbout)))
 
         menu.addItem(.separator())
-        menu.addItem(item("Quit TabType", icon: "power", action: #selector(quit), key: "q"))
+        menu.addItem(item("Quit \(ProductIdentity.name)", icon: "power", action: #selector(quit), key: "q"))
     }
 
     /// Build an `NSMenuItem` with an SF Symbol icon.
@@ -235,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 self.secureInputActive = active
                 self.secureInputHolder = holder
                 self.statusItem.button?.toolTip = active
-                    ? "\(holder ?? "Another app") has Secure Input on — TabType can't see keystrokes until it releases it."
+                    ? "\(holder ?? "Another app") has Secure Input on — \(ProductIdentity.name) can't see keystrokes until it releases it."
                     : nil
                 self.rebuildMenu()
                 if active {
@@ -284,12 +262,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         openSettings()
     }
 
-    @objc private func openSettings() {
+    @objc func openSettings() {
         if settingsWindow == nil {
             let view = SettingsView().environmentObject(settings).environmentObject(llamaModels)
             let hosting = NSHostingController(rootView: view)
             let window = NSWindow(contentViewController: hosting)
-            window.title = "TabType Settings"
+            window.title = "\(ProductIdentity.name) Settings"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: SettingsNavigator.shared.desiredContentWidth, height: 620))
             window.minSize = NSSize(width: 760, height: 460)
@@ -348,7 +326,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             )
             let hosting = NSHostingController(rootView: view)
             let window = NSWindow(contentViewController: hosting)
-            window.title = "Welcome to TabType"
+            window.title = "Welcome to \(ProductIdentity.name)"
             window.styleMask = [.titled, .closable]
             window.setContentSize(NSSize(width: 480, height: 420))
             window.isReleasedWhenClosed = false
@@ -363,17 +341,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSWorkspace.shared.open(Log.fileURL)
     }
 
-    /// Best-effort: write the global default that controls macOS inline predictive
-    /// text so it doesn't conflict with TabType. Fully applies after log out/in.
-    private func applyMacOSPredictiveText() {
-        let key = "NSAutomaticInlinePredictionEnabled" as CFString
-        let value = settings.disableMacOSPredictiveText ? kCFBooleanFalse : nil
-        CFPreferencesSetValue(key, value, kCFPreferencesAnyApplication,
-                              kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
-        CFPreferencesSynchronize(kCFPreferencesAnyApplication,
-                                 kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
-    }
-
     @objc private func quit() {
         NSApp.terminate(nil)
     }
@@ -386,21 +353,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.setActivationPolicy(.accessory)
     }
 
-    // MARK: - Permission polling
-
-    private func waitForTrustThenStart() {
-        trustTimer?.invalidate()
-        trustTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                if AccessibilityBridge.isTrusted() {
-                    self.trustTimer?.invalidate()
-                    self.trustTimer = nil
-                    _ = self.engine.start()
-                    self.rebuildMenu()
-                    self.onboardingWindow?.close()
-                }
-            }
-        }
-    }
 }

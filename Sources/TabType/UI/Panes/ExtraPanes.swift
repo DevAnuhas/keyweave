@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What TabType is allowed to read for extra context, grouped the way Cotypist's own
+/// What Keyweave is allowed to read for extra context, grouped the way Cotypist's own
 /// Context pane is (Screenshot Settings / Clipboard Settings) rather than folded into
 /// Personalization.
 struct ContextPane: View {
@@ -10,16 +10,17 @@ struct ContextPane: View {
         Form {
             Section("Screen Context") {
                 Toggle("Read on-screen context", isOn: $settings.useScreenContext)
-                Text("Reads the conversation or document around your cursor — via the accessibility tree in chat apps, or an on-device screenshot elsewhere — so suggestions match what you're working on. Chat apps like Slack and Claude always use this.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("TabType picks a context recipe per app: the conversation in chat apps and chat websites (accessibility tree, no screenshots), your document in writing apps, and nearby on-screen text elsewhere. Open the Apps section to see exactly what applies to each app — and to change it.")
+                    .disabled(!AppSafetyPolicy.screenContextEnabled)
+                Text("Additional screen and conversation context is off in this build.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Use screenshots to improve suggestion appearance", isOn: $settings.useScreenshotAppearance)
+                    .disabled(!AppSafetyPolicy.screenshotAppearanceEnabled)
                 Text("Samples the color around the caret so ghost text blends with the field's real text. May occasionally show a Screen Recording indicator in the menu bar.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Clipboard Settings") {
                 Toggle("Use clipboard for context", isOn: $settings.useClipboardContext)
+                    .disabled(!AppSafetyPolicy.clipboardContextEnabled)
                 Text("Reads your clipboard to understand what you're working with. Processed locally; never stored or sent anywhere.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -116,7 +117,7 @@ struct ShortcutsPane: View {
                 KeyRecorderRow(title: "Word alternatives", binding: $settings.wordAlternativesKey)
                 KeyRecorderRow(title: "Force a suggestion", binding: $settings.forceActivateKey)
                 KeyRecorderRow(title: "Pause in current app (5 min)", binding: $settings.appPauseKey)
-                KeyRecorderRow(title: "Enable/disable TabType", binding: $settings.toggleKey, allowNone: true)
+                KeyRecorderRow(title: "Enable/disable Keyweave", binding: $settings.toggleKey, allowNone: true)
                 Text("Hold ⌥ with the accept key to send the real key to the app (e.g. ⌥Tab moves between form fields while a suggestion is shown).")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -235,6 +236,10 @@ struct SyncSection: View {
         Section("Sync between Macs") {
             Toggle("Sync settings and learned writing via iCloud Drive", isOn: Binding(
                 get: { sync.enabled }, set: { sync.enabled = $0 }))
+                .disabled(!AppSafetyPolicy.syncEnabled)
+            if !AppSafetyPolicy.syncEnabled {
+                Text("Sync is off in this build.").font(.caption).foregroundStyle(.secondary)
+            }
             if sync.enabled {
                 HStack {
                     SecureField(sync.hasPassphrase ? "Passphrase set — enter a new one to change it" : "Sync passphrase",
@@ -261,7 +266,8 @@ struct PersonalizationPane: View {
             SyncSection()
             Section("Learn from your writing") {
                 Toggle("Learn from what I write", isOn: $settings.collectTypingHistory)
-                Text("TabType keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
+                    .disabled(!AppSafetyPolicy.writingEnabled)
+                Text("Keyweave keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Personalization strength", selection: $settings.personalizationStrength) {
                     Text("Gentle").tag("gentle")
@@ -272,7 +278,8 @@ struct PersonalizationPane: View {
                 Text("How strongly your own past phrasing steers suggestions.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Record text even when you accept no suggestion", isOn: $settings.recordWithoutAccepts)
-                Text("Off: TabType only learns from messages where you used at least one suggestion.")
+                    .disabled(!AppSafetyPolicy.writingEnabled)
+                Text("Off: Keyweave only learns from messages where you used at least one suggestion.")
                     .font(.caption).foregroundStyle(.secondary)
                 LearnedWritingRow()
             }
@@ -393,30 +400,7 @@ struct UpdatesSection: View {
     var body: some View {
         Section("Updates") {
             LabeledContent("Version", value: updater.currentVersion)
-            Toggle("Check for updates automatically", isOn: Binding(
-                get: { updater.automatic }, set: { updater.automatic = $0 }))
-            switch updater.state {
-            case .available(let release):
-                HStack {
-                    Text("TabType \(release.version) is available.")
-                    Spacer()
-                    Button("Release notes") { NSWorkspace.shared.open(release.page) }
-                    Button("Download & Install") { updater.install(release) }
-                        .buttonStyle(.borderedProminent)
-                }
-            case .installing(let step):
-                HStack { ProgressView().controlSize(.small); Text(step) }
-            case .checking:
-                HStack { ProgressView().controlSize(.small); Text("Checking…") }
-            case .upToDate:
-                Text("You're up to date.").foregroundStyle(.secondary)
-            case .failed(let message):
-                Text(message).foregroundStyle(.red)
-            case .idle:
-                EmptyView()
-            }
-            Button("Check Now") { Task { await updater.check() } }
-            Text("Checks this project's GitHub Releases (no data about you is sent). Before installing, the download is checked against the checksum in the release notes and must be signed like this copy of TabType.")
+            Text("App updates are disabled until Keyweave has its own distribution and publisher verification.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -431,7 +415,7 @@ struct AboutPane: View {
                         Image(systemName: "text.cursor")
                             .font(.system(size: 28)).foregroundStyle(.tint)
                         VStack(alignment: .leading) {
-                            Text("TabType").font(.title2).bold()
+                            Text("Keyweave").font(.title2).bold()
                             Text("Free, open-source, on-device autocomplete for macOS.")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
@@ -448,7 +432,7 @@ struct AboutPane: View {
                       systemImage: "key.slash")
             }
             Section("Open source") {
-                Text("MIT licensed. Inspired by Cotypist; built in the open, more permissive than AGPL alternatives.")
+                Text("Keyweave is an MIT-licensed fork of TabType. Upstream copyright and third-party acknowledgments are preserved.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Section("Third-party acknowledgments") {
@@ -476,7 +460,7 @@ struct AboutPane: View {
 }
 
 
-/// How much writing TabType has learned from, with an erase button.
+/// How much writing Keyweave has learned from, with an erase button.
 private struct LearnedWritingRow: View {
     @ObservedObject private var store = WritingStore.shared
     @State private var confirming = false
@@ -491,7 +475,7 @@ private struct LearnedWritingRow: View {
             Button("Erase…", role: .destructive) { confirming = true }
                 .disabled(store.documentCount == 0)
         }
-        .confirmationDialog("Erase everything TabType learned from your writing?", isPresented: $confirming) {
+        .confirmationDialog("Erase everything Keyweave learned from your writing?", isPresented: $confirming) {
             Button("Erase", role: .destructive) { store.eraseAll() }
         }
     }

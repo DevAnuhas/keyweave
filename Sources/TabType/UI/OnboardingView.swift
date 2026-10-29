@@ -16,9 +16,9 @@ struct OnboardingView: View {
                 .foregroundStyle(.tint)
                 .padding(.top, 4)
 
-            Text("Welcome to TabType").font(.title).bold()
+            Text("Welcome to Keyweave").font(.title).bold()
 
-            Text("Free, on-device autocomplete for macOS. As you type, TabType suggests your next words — press Tab to accept. Nothing leaves your Mac.")
+            Text("Free, on-device autocomplete for macOS. As you type, Keyweave suggests your next words — press Tab to accept. Nothing leaves your Mac.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -29,16 +29,12 @@ struct OnboardingView: View {
             permissionRow(
                 ok: trusted,
                 title: "Accessibility (required)",
-                detail: "Lets TabType read the field you're typing in and insert accepted suggestions.",
+                detail: "Lets Keyweave read the field you're typing in and insert accepted suggestions.",
                 buttonTitle: "Grant Accessibility",
                 action: onGrant)
 
-            permissionRow(
-                ok: screenOK,
-                title: "Screen Recording (recommended)",
-                detail: "Lets TabType read what's on screen (via on-device OCR) so suggestions match what you're looking at. Fully local.",
-                buttonTitle: "Grant Screen Recording",
-                action: onGrantScreen)
+            Text("Screen context, writing memory and sync are off in this build.")
+                .font(.callout).foregroundStyle(.secondary)
 
             Button("Get Started") { onDone() }
                 .keyboardShortcut(.defaultAction)

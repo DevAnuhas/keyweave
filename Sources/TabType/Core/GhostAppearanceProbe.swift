@@ -28,6 +28,7 @@ final class GhostAppearanceProbe: ObservableObject {
 
     /// Kick a probe of the caret line if stale. Non-blocking; updates `cached`.
     func refresh(caretRect: CGRect) {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return }
         guard CGPreflightScreenCaptureAccess(), !probing,
               Date().timeIntervalSince(lastProbe) > minInterval,
               caretRect.width.isFinite, caretRect.height > 1 else { return }
@@ -56,6 +57,7 @@ final class GhostAppearanceProbe: ObservableObject {
     /// (no permission / capture failure) — caller decides the default.
     ///
     nonisolated static func hasTextPixels(in rect: CGRect) async -> Bool? {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
         guard rect.width >= 8, rect.height >= 6 else {
             Log.shared.debug("occupancy: strip \(rect) too small — nil")
             return nil
@@ -91,6 +93,7 @@ final class GhostAppearanceProbe: ObservableObject {
     /// the (padded, app-dependent) AX line box. nil when the strip is empty or
     /// capture fails.
     nonisolated static func inkBand(in rect: CGRect) async -> InkBand? {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
         guard rect.width >= 20, rect.height >= 8,
               CGPreflightScreenCaptureAccess(),
               let image = await capture(rect: rect),
@@ -158,6 +161,7 @@ final class GhostAppearanceProbe: ObservableObject {
     /// Screenshot of `rect` (top-left global points) at the display's real pixel
     /// scale, with TabType's own windows excluded so the ghost never sees itself.
     nonisolated static func captureScaled(rect: CGRect) async -> (image: CGImage, scale: Double)? {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
         guard let content = await ShareableContentCache.shared.content() else { return nil }
         guard let display = content.displays.first(where: { displayRectTopLeft($0).intersects(rect) })
                 ?? content.displays.first else { return nil }
@@ -312,6 +316,7 @@ final class ShareableContentCache: @unchecked Sendable {
     private var cached: (content: SCShareableContent, at: Date)?
 
     func content() async -> SCShareableContent? {
+        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
         if let hit = lock.withLock({ cached.flatMap { Date().timeIntervalSince($0.at) < 5 ? $0.content : nil } }) {
             return hit
         }

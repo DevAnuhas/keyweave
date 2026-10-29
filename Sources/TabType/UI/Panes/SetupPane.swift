@@ -25,7 +25,7 @@ struct SetupPane: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(allSet ? "All set!" : "Finish setup").font(.headline)
                         Text(allSet
-                             ? "TabType is ready to use. Start typing in any app and press Tab to accept a suggestion."
+                             ? "Keyweave is ready to use. Start typing in any app and press Tab to accept a suggestion."
                              : "Complete the steps below to start getting suggestions.")
                             .font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -38,30 +38,26 @@ struct SetupPane: View {
             Section {
                 statusRow(
                     ok: trusted, title: "Accessibility permission",
-                    detail: "Required — lets TabType read the field you're typing in and insert completions.",
+                    detail: "Required — lets Keyweave read the field you're typing in and insert completions.",
                     action: (trusted ? nil : ("Grant", { _ = AccessibilityBridge.requestTrust() })),
                     doneLabel: "Granted")
 
                 statusRow(
                     ok: screenOK, title: "Screen Recording permission",
-                    detail: "Recommended for better context in non-chat apps. Screenshots are processed locally and never stored or sent anywhere.",
-                    action: (screenOK ? nil : ("Grant", { _ = ScreenContextProvider.shared.requestPermission() })),
-                    doneLabel: "Granted")
+                    detail: "Screen context and appearance capture are off in this build.",
+                    action: nil,
+                    doneLabel: "Off")
 
                 modelRow
 
-                statusRow(
-                    ok: settings.disableMacOSPredictiveText,
-                    title: "macOS text suggestions",
-                    detail: "Disable the built-in inline suggestions to avoid conflicts with TabType.",
-                    action: (settings.disableMacOSPredictiveText ? nil
-                             : ("Disable", { settings.disableMacOSPredictiveText = true })),
-                    doneLabel: "Disabled")
+                Text("Manage macOS text suggestions in System Settings. Keyweave does not change that preference.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Optional") {
                 Toggle("Use clipboard as context", isOn: $settings.useClipboardContext)
-                Text("When on, TabType reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
+                    .disabled(!AppSafetyPolicy.clipboardContextEnabled)
+                Text("When on, Keyweave reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

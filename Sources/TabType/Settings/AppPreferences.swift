@@ -5,6 +5,7 @@ import TabTypeKit
 /// Build-time capabilities for Gate0. Persisted preferences and app overrides
 /// cannot enable these services in this build.
 enum AppSafetyPolicy {
+    static let inputMonitoringEnabled = false
     static let syncEnabled = false
     static let writingEnabled = false
     static let screenContextEnabled = false
