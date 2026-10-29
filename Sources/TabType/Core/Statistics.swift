@@ -45,7 +45,7 @@ final class Statistics: ObservableObject {
     /// Time from request to suggestion for the most recent shown suggestions.
     @Published private(set) var latencySamples: [Int]
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private enum Keys {
         static let shown = "stat_suggestionsShown"
         static let accepted = "stat_suggestionsAccepted"
@@ -56,7 +56,8 @@ final class Statistics: ObservableObject {
         static let latency = "stat_latencySamples"
     }
 
-    private init() {
+    init(defaults: UserDefaults = AppPreferences.current) {
+        self.defaults = defaults
         suggestionsShown = defaults.integer(forKey: Keys.shown)
         suggestionsAccepted = defaults.integer(forKey: Keys.accepted)
         wordsCompleted = defaults.integer(forKey: Keys.words)

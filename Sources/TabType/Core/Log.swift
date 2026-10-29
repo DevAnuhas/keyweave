@@ -1,9 +1,10 @@
 import Foundation
+import TabTypeKit
 
 /// Lightweight file logger for diagnosing behavior in specific apps without a
-/// debugger. Writes to ~/Library/Logs/TabType/tabtype.log. Verbose entries are
+/// debugger. Writes to Keyweave's own log directory. Verbose entries are
 /// gated by `verbose` so normal runs stay quiet. The file is capped: past
-/// `maxBytes` its newest `keptBytes` move to tabtype.1.log and it starts over,
+/// `maxBytes` its newest `keptBytes` move to keyweave.1.log and it starts over,
 /// so the log (which holds typed text when verbose) never piles up.
 final class Log: @unchecked Sendable {
     static let shared = Log()
@@ -19,15 +20,11 @@ final class Log: @unchecked Sendable {
     static let maxBytes: UInt64 = 5 * 1024 * 1024
     static let keptBytes = 1024 * 1024
 
-    private init() {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/TabType", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        url = dir.appendingPathComponent("tabtype.log")
-        previousURL = dir.appendingPathComponent("tabtype.1.log")
+    init(directory: URL = AppPaths.current.logsDirectory) {
+        url = directory.appendingPathComponent("keyweave.log")
+        previousURL = directory.appendingPathComponent("keyweave.1.log")
         formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
-        queue.async { [self] in rotateIfNeeded() }
     }
 
     static var fileURL: URL { shared.url }
@@ -52,6 +49,7 @@ final class Log: @unchecked Sendable {
     private func write(_ message: String) {
         let line = "[\(formatter.string(from: Date()))] \(message)\n"
         queue.async { [self] in
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             writesSinceCheck += 1
             if writesSinceCheck >= 500 { writesSinceCheck = 0; rotateIfNeeded() }
             guard let data = line.data(using: .utf8) else { return }

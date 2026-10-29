@@ -3,8 +3,8 @@ import Foundation
 import TabTypeKit
 
 /// The author's own writing, kept (opt-in) so suggestions can reuse their
-/// phrasing. Encrypted at rest with the same file-based key as the old typing
-/// history; scrubbed of secrets before storage; capped in size.
+/// phrasing. Encrypted at rest; scrubbed of secrets before storage; capped in
+/// size. Gate0 never starts this service or reads/imports an older store.
 @MainActor
 final class WritingStore: ObservableObject {
     static let shared = WritingStore()
@@ -33,18 +33,21 @@ final class WritingStore: ObservableObject {
     private let directory: URL
     private var fileURL: URL { directory.appendingPathComponent("writing.enc") }
     private var keyURL: URL { directory.appendingPathComponent("history.key") }
-    private var legacyHistoryURL: URL { directory.appendingPathComponent("typing-history.enc") }
 
-    private init() {
-        directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("TabType", isDirectory: true)
+    init(directory: URL = AppPaths.current.supportDirectory) {
+        self.directory = directory
+    }
+
+    /// Loading is an explicit lifecycle operation, never part of construction.
+    func start() {
+        guard AppSafetyPolicy.writingEnabled else { return }
         load()
-        importLegacyHistory()
     }
 
     var texts: [String] { documents.map(\.text) }
 
     func record(_ text: String, bundleId: String, fieldKey: String?, kind: Kind) {
+        guard AppSafetyPolicy.writingEnabled else { return }
         let clean = SecretSanitizer.sanitize(text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard clean.count >= minimumLength else { return }
         switch kind {
@@ -69,6 +72,7 @@ final class WritingStore: ObservableObject {
     /// `{"bundleId": …, "text": …}` per line — e.g. past messages recovered
     /// from the local log) is recorded like anything written, then deleted.
     func importPendingFile() {
+        guard AppSafetyPolicy.writingEnabled else { return }
         let url = directory.appendingPathComponent("import-writing.jsonl")
         guard let data = try? String(contentsOf: url, encoding: .utf8) else { return }
         var count = 0
@@ -88,6 +92,7 @@ final class WritingStore: ObservableObject {
 
     /// Merge writing from another Mac: union by key, the newer version wins.
     func merge(_ incoming: [Document]) {
+        guard AppSafetyPolicy.writingEnabled else { return }
         var changed = false
         for doc in incoming {
             if let i = documents.firstIndex(where: { $0.key == doc.key }) {
@@ -106,6 +111,7 @@ final class WritingStore: ObservableObject {
     }
 
     func eraseAll() {
+        guard AppSafetyPolicy.writingEnabled else { return }
         documents.removeAll()
         try? FileManager.default.removeItem(at: fileURL)
         refreshCounts()
@@ -129,7 +135,8 @@ final class WritingStore: ObservableObject {
     }
 
     private func persist() {
-        guard let key = encryptionKey(), let data = try? JSONEncoder().encode(documents),
+        guard AppSafetyPolicy.writingEnabled,
+              let key = encryptionKeyForWriting(), let data = try? JSONEncoder().encode(documents),
               let sealed = try? AES.GCM.seal(data, using: key).combined else { return }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? sealed.write(to: fileURL, options: .atomic)
@@ -138,7 +145,8 @@ final class WritingStore: ObservableObject {
     }
 
     private func load() {
-        guard let key = encryptionKey(), let sealed = try? Data(contentsOf: fileURL),
+        guard AppSafetyPolicy.writingEnabled,
+              let key = existingEncryptionKey(), let sealed = try? Data(contentsOf: fileURL),
               let box = try? AES.GCM.SealedBox(combined: sealed),
               let data = try? AES.GCM.open(box, using: key),
               let docs = try? JSONDecoder().decode([Document].self, from: data) else { return }
@@ -146,25 +154,18 @@ final class WritingStore: ObservableObject {
         refreshCounts()
     }
 
-    /// One-time import of the old snippet history (entries only).
-    private func importLegacyHistory() {
-        let marker = "writingStoreImportedLegacy"
-        guard !UserDefaults.standard.bool(forKey: marker) else { return }
-        UserDefaults.standard.set(true, forKey: marker)
-        guard FileManager.default.fileExists(atPath: legacyHistoryURL.path), let key = encryptionKey(),
-              let sealed = try? Data(contentsOf: legacyHistoryURL),
-              let box = try? AES.GCM.SealedBox(combined: sealed),
-              let data = try? AES.GCM.open(box, using: key) else { return }
-        struct Legacy: Decodable { var entries: [String] }
-        let entries = (try? JSONDecoder().decode(Legacy.self, from: data).entries)
-            ?? (try? JSONDecoder().decode([String].self, from: data)) ?? []
-        for entry in entries { record(entry, bundleId: "imported", fieldKey: nil, kind: .message) }
-        Log.shared.info("writing store: imported \(entries.count) entries from the old typing history")
+    /// Read-only lookup: absent or malformed keys must not be replaced by reads.
+    private func existingEncryptionKey() -> SymmetricKey? {
+        guard let data = try? Data(contentsOf: keyURL), data.count == 32 else { return nil }
+        return SymmetricKey(data: data)
     }
 
-    /// The 0600 key file shared with the old typing history (no Keychain prompts).
-    private func encryptionKey() -> SymmetricKey? {
-        if let data = try? Data(contentsOf: keyURL), data.count == 32 { return SymmetricKey(data: data) }
+    /// A new key may only be created for an explicitly enabled write and a new
+    /// store. An existing malformed/unreadable key or encrypted file is retained.
+    private func encryptionKeyForWriting() -> SymmetricKey? {
+        if let key = existingEncryptionKey() { return key }
+        guard !FileManager.default.fileExists(atPath: keyURL.path),
+              !FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
         let key = SymmetricKey(size: .bits256)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -185,13 +186,18 @@ final class PersonalIndex {
     private var rebuild: Task<Void, Never>?
 
     func start() {
+        guard AppSafetyPolicy.writingEnabled else { return }
         WritingStore.shared.onChange = { [weak self] in self?.scheduleRebuild() }
         scheduleRebuild(delay: 0)
     }
 
-    func hint(after typed: String) -> RetrievalHint? { index?.continuation(after: typed) }
+    func hint(after typed: String) -> RetrievalHint? {
+        guard AppSafetyPolicy.writingEnabled else { return nil }
+        return index?.continuation(after: typed)
+    }
 
     private func scheduleRebuild(delay: TimeInterval = 5) {
+        guard AppSafetyPolicy.writingEnabled else { return }
         rebuild?.cancel()
         let texts = WritingStore.shared.texts
         rebuild = Task { [weak self] in
