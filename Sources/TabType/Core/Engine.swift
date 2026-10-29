@@ -133,8 +133,15 @@ final class Engine {
 
     /// Whether to learn from writing in `bundleId`: the per-app choice, else the
     /// global "learn from my writing" setting.
-    private func learnsFromWriting(_ bundleId: String) -> Bool {
-        AppPolicyStore.userOverrides[bundleId]?.learnFromWriting ?? settings.collectTypingHistory
+    func learnsFromWriting(_ bundleId: String) -> Bool {
+        AppSafetyPolicy.writingEnabled &&
+            (AppPolicyStore.userOverrides[bundleId]?.learnFromWriting ?? settings.collectTypingHistory)
+    }
+
+    /// Effective consent includes the build gate, even for forced app recipes.
+    func usesScreenContext(for policy: AppPolicy) -> Bool {
+        AppSafetyPolicy.screenContextEnabled &&
+            (settings.useScreenContext || policy.forceScreenContext) && policy.includesScreenContext
     }
 
     /// Keep the text written in the field being left (a draft, email, note…).
@@ -166,17 +173,19 @@ final class Engine {
             WritingStore.shared.record(text, bundleId: bundleId, fieldKey: nil, kind: .message)
         }
         acceptedInCurrentText = false
-        var list = recentInputs[bundleId] ?? []
-        if list.last != text {
-            list.append(SecretSanitizer.sanitize(String(text.suffix(300))))
-            if list.count > 3 { list.removeFirst(list.count - 3) }
-            recentInputs[bundleId] = list
+        if AppSafetyPolicy.writingEnabled {
+            var list = recentInputs[bundleId] ?? []
+            if list.last != text {
+                list.append(SecretSanitizer.sanitize(String(text.suffix(300))))
+                if list.count > 3 { list.removeFirst(list.count - 3) }
+                recentInputs[bundleId] = list
+            }
         }
         buffer = ""   // the message left the field
         // The sent message (and often a reply) is about to appear in the transcript —
         // capture it sooner than the next natural refresh would.
         let policy = AppPolicyStore.policy(forBundleId: bundleId)
-        if (settings.useScreenContext || policy.forceScreenContext) && policy.includesScreenContext {
+        if usesScreenContext(for: policy) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 ScreenContextProvider.shared.refreshIfStale()
             }
@@ -229,6 +238,7 @@ final class Engine {
     /// (usually missing Accessibility permission).
     @discardableResult
     func start() -> Bool {
+        guard AppSafetyPolicy.inputMonitoringEnabled else { return false }
         guard !isRunning else { return true }
         // A hung app must not stall typing: cap every AX call (Cotypist does too).
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.25)
@@ -238,7 +248,9 @@ final class Engine {
         installFreshContextRekick()
         // Whatever is on the pasteboard at launch predates this session — treat it
         // as stale so it never enters a prompt (only copies made from now on do).
-        clipboardChangeCount = NSPasteboard.general.changeCount
+        if AppSafetyPolicy.clipboardContextEnabled {
+            clipboardChangeCount = NSPasteboard.general.changeCount
+        }
         clipboardFirstSeen = .distantPast
         isRunning = true
         refreshHotKeys()
@@ -408,7 +420,7 @@ final class Engine {
                 let policy = AppPolicyStore.policy(
                     forBundleId: AccessibilityBridge.frontmostBundleId(),
                     host: AccessibilityBridge.frontmostURLHost())
-                if (self.settings.useScreenContext || policy.forceScreenContext) && policy.includesScreenContext {
+                if self.usesScreenContext(for: policy) {
                     ScreenContextProvider.shared.refreshIfStale()
                 }
                 self.schedulePrewarm(policy: policy)
@@ -438,8 +450,7 @@ final class Engine {
             guard self.currentSuggestion == nil, self.buffer.isEmpty else { return }
             let bid = AccessibilityBridge.frontmostBundleId()
             let screenCap = policy.screenContextCap ?? AppPolicyStore.defaultContextCap
-            let screenEnabled = (self.settings.useScreenContext || policy.forceScreenContext)
-                && policy.includesScreenContext
+            let screenEnabled = self.usesScreenContext(for: policy)
             let screen = screenEnabled
                 ? ScreenContextProvider.shared.contextText(for: bid, cap: screenCap) : ""
             let key = (bid ?? "") + "|" + String(screen.hashValue)
@@ -887,8 +898,7 @@ final class Engine {
             guard let self else { return }
             let policy = AppPolicyStore.policy(forBundleId: AccessibilityBridge.frontmostBundleId(),
                                                host: AccessibilityBridge.frontmostURLHost())
-            if (self.settings.useScreenContext || policy.forceScreenContext) && policy.includesScreenContext
-                && !PowerMonitor.shared.shouldPauseCapture {
+            if self.usesScreenContext(for: policy) && !PowerMonitor.shared.shouldPauseCapture {
                 ScreenContextProvider.shared.refreshIfStale()
             }
         }
@@ -908,7 +918,7 @@ final class Engine {
             // waiting for the next runPrediction() cycle — otherwise the very first
             // suggestion in a freshly-focused window has no completed capture yet.
             let policy = AppPolicyStore.policy(forBundleId: AccessibilityBridge.frontmostBundleId())
-            if (settings.useScreenContext || policy.forceScreenContext) && policy.includesScreenContext {
+            if usesScreenContext(for: policy) {
                 ScreenContextProvider.shared.refreshIfStale()
             }
         }
@@ -1404,8 +1414,7 @@ final class Engine {
         // Screen memory (throttled, off the typing path), unless this app opts out or
         // we're conserving battery. Chat/messaging apps force this on regardless of
         // the global toggle — reading recent conversation is the whole point there.
-        let screenContextEnabled = (settings.useScreenContext || policy.forceScreenContext)
-            && policy.includesScreenContext
+        let screenContextEnabled = usesScreenContext(for: policy)
         if screenContextEnabled && !PowerMonitor.shared.shouldPauseCapture {
             ScreenContextProvider.shared.refreshIfStale()
         }
@@ -1452,7 +1461,7 @@ final class Engine {
             fallbackBuffer: buffer,
             screenContext: screenContext,
             inputChars: expectedLimit,
-            wantsDocumentHead: policy.documentProfile)
+            wantsDocumentHead: AppSafetyPolicy.screenContextEnabled && policy.documentProfile)
         let current = reconcile(axInput: ctx.input, readAt: readAt)
         if current != ctx.input {
             ctx.input = current
@@ -2127,6 +2136,7 @@ final class Engine {
     /// (copied minutes/hours ago) are noise, not signal. Also skips non-prose
     /// content (logs, timestamps, hex dumps) via a letter-ratio gate.
     private func freshClipboardText() -> String {
+        guard AppSafetyPolicy.clipboardContextEnabled, settings.useClipboardContext else { return "" }
         let pb = NSPasteboard.general
         if pb.changeCount != clipboardChangeCount {
             clipboardChangeCount = pb.changeCount

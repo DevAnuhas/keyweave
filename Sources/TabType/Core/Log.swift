@@ -46,12 +46,17 @@ final class Log: @unchecked Sendable {
         }
     }
 
+    /// Wait for already queued writes and clears to finish. Does not write or rotate.
+    func flush() { queue.sync {} }
+
     private func write(_ message: String) {
         let line = "[\(formatter.string(from: Date()))] \(message)\n"
         queue.async { [self] in
             try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            writesSinceCheck += 1
-            if writesSinceCheck >= 500 { writesSinceCheck = 0; rotateIfNeeded() }
+            // Defer the initial check until real use, then recheck every 500 writes.
+            // Each new process must check even if its previous session was short.
+            if writesSinceCheck == 0 { rotateIfNeeded() }
+            writesSinceCheck = (writesSinceCheck + 1) % 500
             guard let data = line.data(using: .utf8) else { return }
             if let handle = try? FileHandle(forWritingTo: url) {
                 defer { try? handle.close() }

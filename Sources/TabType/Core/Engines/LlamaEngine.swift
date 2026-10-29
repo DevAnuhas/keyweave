@@ -40,7 +40,8 @@ final class LlamaEngine {
         options.maxWords = max(1, request.maxWords)
         // What the author wrote after these words before, if they opted in.
         var hintSupport = 0
-        if AppSettings.shared.collectTypingHistory || request.learnsFromWriting,
+        if AppSafetyPolicy.writingEnabled,
+           AppSettings.shared.collectTypingHistory || request.learnsFromWriting,
            let hint = PersonalIndex.shared.hint(after: request.beforeCursor) {
             options.hint = Array(hint.text.utf8)
             options.hintBonus = AppSettings.shared.personalization.bonus
