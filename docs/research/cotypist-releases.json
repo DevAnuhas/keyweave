@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "product": "Cotypist",
+  "as_of": "2026-10-29",
+  "canonical_appcast_url": "https://cotypist.app/updates/cotypist.xml",
+  "historical_completeness_claimed": false,
+  "release_version_count": 4,
+  "count_semantics": "Exact unique version identities explicitly represented in accessible live/archived official notes. Family headings and retrospective mentions are distinct from independently dated updater entries.",
+  "dedupe_key": "product plus literal version string",
+  "date_policy": "Missing exact dates remain null. Feed family pubDates, patch release dates, archive capture dates, article dates and retrieval timestamps are not interchangeable.",
+  "reuse_note": "Original factual summaries and metadata only. Full vendor documents are local analysis-only in local-sources; do not publish or attach those copies.",
+  "releases": [
+    {
+      "version": "2026.3",
+      "date": "2026-07-07",
+      "date_status": "shared_release_family_feed_pubDate",
+      "published_at_utc": "2026-07-07T07:00:00+00:00",
+      "known_by": "2026-07-16",
+      "build": null,
+      "record_type": "release_family_heading",
+      "summary": "Expanded emoji matching to emoticons; added Escape and trailing-space/punctuation controls; improved speed and memory use, BBEdit and editor compatibility, Claude Code prompt handling, screenshots, stability and subscription checks.",
+      "categories": [
+        "emoji",
+        "keyboard-controls",
+        "completion-controls",
+        "performance",
+        "resource-efficiency",
+        "application-compatibility",
+        "code-editors",
+        "terminal-agents",
+        "screen-context",
+        "stability",
+        "licensing"
+      ],
+      "date_note": "The feed title and release heading say 2026.3, but the retained enclosure is 2026.3.1. July 7 is the shared family feed date, not independently verified patch chronology.",
+      "sources": [
+        {
+          "source_url": "https://web.archive.org/web/20260716093154id_/https://cotypist.app/updates/cotypist.xml",
+          "canonical_official_url": "https://cotypist.app/updates/cotypist.xml",
+          "sha256": "de40365da17566d5bdc646f30c28410138af6f0314f63b63a1358f1ccf313c77",
+          "source_role": "feed_title_and_h2_release_family",
+          "provenance": "archived_official_source"
+        }
+      ]
+    },
+    {
+      "version": "2026.3.1",
+      "date": null,
+      "date_status": "patch_date_not_independently_stated",
+      "published_at_utc": null,
+      "known_by": "2026-07-16",
+      "build": "79",
+      "record_type": "enclosure_release_with_explicit_patch_note",
+      "summary": "Improved the reliability of built-in autocorrect; the archived updater item also retains the broader 2026.3 family notes.",
+      "categories": [
+        "autocorrect",
+        "stability"
+      ],
+      "date_note": "The enclosure and an explicit fix identify 2026.3.1. The same item keeps July 7 as its family pubDate; the archive establishes availability of this evidence by July 16, not the exact patch release date.",
+      "shared_feed_pubDate": "Tue, 07 Jul 2026 09:00:00 +0200",
+      "sources": [
+        {
+          "source_url": "https://web.archive.org/web/20260716093154id_/https://cotypist.app/updates/cotypist.xml",
+          "canonical_official_url": "https://cotypist.app/updates/cotypist.xml",
+          "sha256": "de40365da17566d5bdc646f30c28410138af6f0314f63b63a1358f1ccf313c77",
+          "source_role": "enclosure_short_version_and_explicit_version_fix",
+          "provenance": "archived_official_source"
+        }
+      ]
+    },
+    {
+      "version": "2026.5",
+      "date": null,
+      "date_status": "retrospective_mention_without_release_date",
+      "published_at_utc": null,
+      "known_by": "2026-10-27",
+      "build": null,
+      "record_type": "retrospective_release_family_summary",
+      "summary": "Added context-sensitive synonyms for selected text, updated smaller and faster models with reduced memory use, extended coding-agent and terminal-multiplexer support, and introduced an option for suggestions in VS Code’s main editor.",
+      "categories": [
+        "synonyms",
+        "model-updates",
+        "performance",
+        "resource-efficiency",
+        "terminal-agents",
+        "code-editors"
+      ],
+      "date_note": "Only a retrospective 2026.5 section within the 2026.5.2 feed item was recovered. The item date is not assigned as the 2026.5 release date.",
+      "sources": [
+        {
+          "source_url": "https://cotypist.app/updates/cotypist.xml",
+          "canonical_official_url": "https://cotypist.app/updates/cotypist.xml",
+          "sha256": "8b9164fe64d9cb1f654db6912fa807d62e77ddebd7e44fc64136f52f0ad19566",
+          "source_role": "explicit_2026.5_retrospective_section",
+          "provenance": "live_official_source"
+        }
+      ]
+    },
+    {
+      "version": "2026.5.2",
+      "date": "2026-10-27",
+      "date_status": "matching_feed_title_heading_and_enclosure_pubDate",
+      "published_at_utc": "2026-10-27T11:19:57+00:00",
+      "known_by": "2026-10-27",
+      "build": "84",
+      "record_type": "enclosure_release_with_explicit_patch_notes",
+      "summary": "Fixed rapid-accept crashes, disabled-app suggestions, numbered-selection layouts and emoji insertion; improved Goldfish support. The item also describes faster, lower-energy completions, current-word-only mode, punctuation controls, wider app support, smart quotes, macOS 27 fixes and reorganized settings.",
+      "categories": [
+        "stability",
+        "application-controls",
+        "keyboard-controls",
+        "emoji",
+        "application-compatibility",
+        "performance",
+        "resource-efficiency",
+        "completion-controls",
+        "terminal-agents",
+        "typography",
+        "macos-compatibility",
+        "settings-ui"
+      ],
+      "scope_note": "The summary distinguishes the explicit 2026.5.2 fixes from other changes listed in the same retained item; those other changes are not independently attributed to an unavailable 2026.5.1 entry. The 2026.5 recap is indexed separately.",
+      "sources": [
+        {
+          "source_url": "https://cotypist.app/updates/cotypist.xml",
+          "canonical_official_url": "https://cotypist.app/updates/cotypist.xml",
+          "sha256": "8b9164fe64d9cb1f654db6912fa807d62e77ddebd7e44fc64136f52f0ad19566",
+          "source_role": "matching_title_h2_enclosure_and_explicit_patch_section",
+          "provenance": "live_official_source"
+        }
+      ]
+    }
+  ],
+  "source_count_verification": [
+    {
+      "source_url": "https://cotypist.app/updates/cotypist.xml",
+      "item_count": 1,
+      "release_heading_count": 1,
+      "item_titles": [
+        "Cotypist 2026.5.2"
+      ],
+      "enclosure_version_count": 1,
+      "heading_versions": [
+        "2026.5.2"
+      ],
+      "items": [
+        {
+          "title": "Cotypist 2026.5.2",
+          "enclosure_short_version": "2026.5.2",
+          "build": "84",
+          "pubDate_raw": "Tue, 27 Oct 2026 12:19:57 +0100",
+          "pubDate_utc": "2026-10-27T11:19:57+00:00",
+          "headings": [
+            "Cotypist 2026.5.2"
+          ],
+          "all_explicit_version_identities": [
+            "2026.5",
+            "2026.5.2"
+          ],
+          "release_notes_link_count": 0,
+          "minimum_system_version": "14.0"
+        }
+      ],
+      "pagination_links": []
+    },
+    {
+      "source_url": "https://web.archive.org/web/20260716093154id_/https://cotypist.app/updates/cotypist.xml",
+      "item_count": 1,
+      "release_heading_count": 1,
+      "item_titles": [
+        "Cotypist 2026.3"
+      ],
+      "enclosure_version_count": 1,
+      "heading_versions": [
+        "2026.3"
+      ],
+      "items": [
+        {
+          "title": "Cotypist 2026.3",
+          "enclosure_short_version": "2026.3.1",
+          "build": "79",
+          "pubDate_raw": "Tue, 07 Jul 2026 09:00:00 +0200",
+          "pubDate_utc": "2026-07-07T07:00:00+00:00",
+          "headings": [
+            "Cotypist 2026.3"
+          ],
+          "all_explicit_version_identities": [
+            "2026.3",
+            "2026.3.1"
+          ],
+          "release_notes_link_count": 0,
+          "minimum_system_version": "14.0"
+        }
+      ],
+      "pagination_links": []
+    }
+  ]
+}

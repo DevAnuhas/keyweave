@@ -1,0 +1,21 @@
+# Start Keyweave in t3code
+
+Work on https://github.com/DevAnuhas/keyweave on my Mac. Keyweave is the working name of our public TabType fork. Start from the currently available `main` branch, inspect open PRs and preserve unrelated work. Read any repository guidance that exists; do not depend on an unpublished bootstrap branch.
+
+Goal: independently implement the complete useful feature set of current Cotypist, including Pro/Labs, and close verified quality/compatibility gaps. Research before implementation.
+
+1. Inspect the inherited source, tests, README, CONTRIBUTING.md and RELEASING.md. Many features already exist: OCR, clipboard context, writing personalization, custom instructions, mid-line completion, alternatives, synonyms and sync. Verify their actual paths instead of rebuilding them from scratch.
+
+2. Use the official https://github.com/morluto/rea, pinned to `rea-agents@6.8.0`. Inspect its published setup/help, preview registration changes and verify tool readiness. Register it with the Codex/Claude Code agent actually running this t3code thread, not with t3code as a separate MCP client. Respect any restart requirement. Prefer an existing supported native engine. Ask before large installs, purchases or paid API use.
+
+3. Locate my installed Cotypist.app, normally `/Applications/Cotypist.app`. Record its version/build, executable hash, signing identity and relevant settings. Research an immutable local copy outside git. Check the applicable terms before deeper probes. The published terms at https://cotypist.app/terms, section 9.4, explicitly prohibit modification/decompilation. Treat decompilation and equivalent deep native probes as blocked until written permission or qualified legal clearance for the intended scope is recorded. Continue public-document research and normal UI-behavior comparison meanwhile; this is not a legal conclusion about every form of observation. Do not modify Cotypist or bypass licensing, tier checks or protections.
+
+4. Discover and read all accessible official Cotypist changelogs/release notes, following site navigation, archive pagination and the app's public Sparkle feed. Build a deduplicated version/date/source index; verify counts and explicitly label any missing history. Classify every entry as a current capability, relevant regression, historical/superseded behavior, distribution prerequisite or unresolved item.
+
+5. Build an evidence-backed parity matrix: official claim/version, observed Cotypist behavior, inherited source path, observed fork behavior, present/partial/missing/unverified status, acceptance test and evidence. Use synthetic writing. Reproduce real behavior and use REA for focused unresolved mechanisms, not an indiscriminate application dump. Never invent results or equate compilation with parity.
+
+6. Propose small, test-first implementation slices. The first code slice must isolate Keyweave's bundle/signing identity, updater, Application Support, preferences, Keychain and iCloud namespace before launching the fork. It must not overwrite TabType/Cotypist data or install upstream TabType updates. Audit rich-text compatibility, caret/font placement, focus/selection races, context freshness, language/model cases, personalization, alternatives, synonyms, sync and lifecycle/performance.
+
+Keep vendor binaries, pseudocode, extracted proprietary prompts/assets/weights, personal writing, raw captures and credentials out of this public repo. Publish only sanitized findings, independently written behavior specs/code and synthetic fixtures. Preserve MIT/third-party notices. REA runs locally, but this agent's model provider may receive tool output; do not expose personal text.
+
+Deliver `docs/research/parity-matrix.md`, a changelog source/coverage index and a prioritized implementation plan. Report actual tool readiness, the target fingerprint, what ran, what remains unknown and only genuinely blocking questions with recommendations. Pause for my plan approval before broader feature implementation. Do not merge or publish a release, spend money, or change my other projects. If setup is blocked or needs a restart, give the exact blocker and continuation step rather than claiming the investigation ran.

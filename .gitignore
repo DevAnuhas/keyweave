@@ -24,3 +24,27 @@ Sources/**/*.gguf
 
 # Eval sets built from the author's own writing — never committed.
 eval/private/
+
+# Private reference-app research and REA working state
+/.rea/
+/.local-research/
+/research/private/
+*.dmg
+*.pkg
+*.har
+*.ips
+*.gpr
+*.rep/
+*.hop
+*.i64
+*.idb
+
+# Model artifacts and secrets must not enter the public fork
+*.gguf
+*.safetensors
+*.p12
+*.p8
+*.key
+.env
+.env.*
+!.env.example
