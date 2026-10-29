@@ -372,10 +372,10 @@ private struct AppOverrideDetail: View {
                 .padding(.vertical, 2)
             }
             Section("Context") {
-                TriStatePicker(title: "Read conversation (accessibility)",
+                TriStatePicker(title: "Read conversation",
                                value: $override.readConversation)
                     .disabled(!AppSafetyPolicy.screenContextEnabled)
-                Text("Reads the visible conversation via the accessibility tree and keeps context always on — the treatment chat apps get. Turn on for any messaging-like app Keyweave doesn't recognize.")
+                Text("Allows conversation context for this app when context is enabled. Screen text is tried when permitted; accessible conversation text can provide context without Screen Recording.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Context size", selection: Binding(
                     get: { override.contextSize ?? "default" },

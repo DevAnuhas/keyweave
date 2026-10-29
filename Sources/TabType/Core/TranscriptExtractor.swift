@@ -3,9 +3,8 @@ import ApplicationServices
 
 /// Per-app context extraction via the ACCESSIBILITY TREE: chat apps expose their
 /// conversation as ordered AXStaticText rows — clean, sender-labeled text with no
-/// OCR noise and no Screen Recording permission. This is the "extraction path"
-/// Cotypist uses for messaging apps (its compatibility docs + binary symbols);
-/// pixel OCR remains the fallback for apps whose trees expose nothing.
+/// OCR noise and no Screen Recording permission. Eligible apps can use this
+/// transcript when permitted pixel OCR is unavailable or produces no usable text.
 /// AXUIElement is a thread-safe CFType but not marked Sendable — box it for
 /// crossing into detached tasks.
 struct AXElementBox: @unchecked Sendable {
@@ -73,9 +72,8 @@ enum TranscriptExtractor {
                 queue.append((child, depth + 1))
             }
         }
-        // Fewer than a few real lines is not a conversation — return nil so the
-        // caller falls back to pixel OCR instead of feeding the model stray UI
-        // strings as "the conversation".
+        // Fewer than a few real lines is not a conversation — return nil rather
+        // than feeding the model stray UI strings as "the conversation".
         guard lines.count >= 3 else { return nil }
         return assemble(lines: lines, budget: budget)
     }
