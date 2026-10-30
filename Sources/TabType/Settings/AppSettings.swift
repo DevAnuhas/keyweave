@@ -12,6 +12,10 @@ final class AppSettings: ObservableObject {
     /// Runtime state only; never persisted or restored from another session.
     @Published var inputMonitoringState: InputMonitoringState = .needsAccessibility
 
+    /// Read by asynchronous work before publishing; unlike UI observers this
+    /// token must reflect a revoked consent before the setter returns.
+    private(set) var privacyRevision = UUID()
+
     enum ScreenCropMode: String, CaseIterable, Codable {
         case fullWindow = "Full Window"
         case columnar = "Columnar Sorting"
@@ -23,7 +27,12 @@ final class AppSettings: ObservableObject {
     private let defaults: UserDefaults
 
     // MARK: General
-    @Published var isEnabled: Bool { didSet { defaults.set(isEnabled, forKey: Keys.isEnabled) } }
+    @Published var isEnabled: Bool {
+        didSet {
+            defaults.set(isEnabled, forKey: Keys.isEnabled)
+            privacyRevision = UUID()
+        }
+    }
     /// Max words shown per suggestion (display cap — the main "length" knob).
     @Published var maxWords: Int { didSet { defaults.set(maxWords, forKey: Keys.maxWords) } }
     /// Ghost-text opacity, 0.15–1.0.
@@ -85,6 +94,7 @@ final class AppSettings: ObservableObject {
                 return
             }
             defaults.set(useScreenContext, forKey: Keys.useScreenContext)
+            privacyRevision = UUID()
         }
     }
     /// Use the clipboard contents as additional context (opt-in; may be sensitive).
@@ -95,6 +105,7 @@ final class AppSettings: ObservableObject {
                 return
             }
             defaults.set(useClipboardContext, forKey: Keys.useClipboardContext)
+            privacyRevision = UUID()
         }
     }
     /// Sample the caret area to match ghost-text colour to the field (screenshot-assisted).
@@ -105,6 +116,7 @@ final class AppSettings: ObservableObject {
                 return
             }
             defaults.set(useScreenshotAppearance, forKey: Keys.useScreenshotAppearance)
+            privacyRevision = UUID()
         }
     }
     /// One-time hint flags.
@@ -164,6 +176,7 @@ final class AppSettings: ObservableObject {
                 return
             }
             defaults.set(recordWithoutAccepts, forKey: Keys.recordWithoutAccepts)
+            privacyRevision = UUID()
         }
     }
     /// Log-space bonus for the author's own continuation, and the factor on the
@@ -182,11 +195,17 @@ final class AppSettings: ObservableObject {
                 return
             }
             defaults.set(collectTypingHistory, forKey: Keys.collectTypingHistory)
+            privacyRevision = UUID()
         }
     }
 
     /// Browser domains where suggestions are disabled (bare hosts, e.g. "mail.google.com").
-    @Published var disabledDomains: Set<String> { didSet { defaults.set(Array(disabledDomains), forKey: Keys.disabledDomains) } }
+    @Published var disabledDomains: Set<String> {
+        didSet {
+            defaults.set(Array(disabledDomains), forKey: Keys.disabledDomains)
+            privacyRevision = UUID()
+        }
+    }
 
     /// Per-app behavior overrides, keyed by bundle id.
     @Published var appOverrides: [String: AppOverride] {
@@ -195,6 +214,7 @@ final class AppSettings: ObservableObject {
             if let data = try? JSONEncoder().encode(appOverrides) {
                 defaults.set(data, forKey: Keys.appOverrides)
             }
+            privacyRevision = UUID()
         }
     }
 

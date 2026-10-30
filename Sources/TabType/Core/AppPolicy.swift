@@ -31,9 +31,7 @@ struct AppPolicy {
     var excludesSecureField: Bool = true
     /// Whether to feed remembered on-screen context to the model for this app.
     var includesScreenContext: Bool = true
-    /// When true, screen-memory context is used for this app even if the user hasn't
-    /// globally turned on `useScreenContext` — for chat/messaging apps where reading
-    /// recent conversation is the whole point, matching Cotypist-style behavior.
+    /// Classifies chat recipes. It never overrides the user's context consent.
     var forceScreenContext: Bool = false
     /// Electron/web apps report caret bounds that lag ~0.3-0.5s behind the real
     /// caret during typing. Presentation there must wait for a typing pause (the
@@ -118,7 +116,7 @@ extension AppPolicy {
         case .chat:
             lines.append(transcriptViaAX
                 ? "Uses screen text when permitted, with conversation text from the accessibility tree as a fallback that needs no Screen Recording."
-                : "Reads nearby on-screen text for conversation context.")
+                : "Reads nearby on-screen text when context is enabled.")
         case .document:
             lines.append("Treats your document as the context — reads a large window around the cursor plus the document's opening lines.")
         case .codeEditor:
@@ -132,7 +130,7 @@ extension AppPolicy {
         }
         let cap = screenContextCap ?? AppPolicyStore.defaultContextCap
         if includesScreenContext, profile != .codeEditor {
-            lines.append("Context budget: up to \(cap.formatted()) characters\(forceScreenContext ? " (always on for this app)" : "").")
+            lines.append("Context budget: up to \(cap.formatted()) characters.")
         }
         if laggyCaret {
             lines.append("Web-style text field: suggestions appear after a brief typing pause so they align correctly.")
@@ -365,6 +363,7 @@ enum AppPolicyStore {
     /// treatment, or resize its context budget.
     private static func applyContextOverrides(_ o: AppOverride, to policy: inout AppPolicy) {
         if let read = o.readConversation {
+            policy.includesScreenContext = read
             policy.transcriptViaAX = read
             policy.forceScreenContext = read
             if read, policy.screenContextCap == nil { policy.screenContextCap = chatContextCap }
@@ -379,6 +378,16 @@ enum AppPolicyStore {
     /// Overrides keyed by website host use a `domain:` prefix in the same store.
     static func domainKey(_ host: String) -> String { "domain:" + host.lowercased() }
 
+    static func domainOverride(for host: String?) -> AppOverride? {
+        guard let host = host?.lowercased() else { return nil }
+        return userOverrides.filter { key, _ in
+            guard key.hasPrefix("domain:") else { return false }
+            let domain = String(key.dropFirst("domain:".count)).lowercased()
+            return !domain.isEmpty && (host == domain || host.hasSuffix("." + domain))
+        }.sorted { $0.key.count == $1.key.count ? $0.key < $1.key : $0.key.count > $1.key.count }
+            .first?.value
+    }
+
     /// Policy for a bundle id AND the current website — the domain override is
     /// applied last (most specific wins). `host` matches exactly or by suffix
     /// ("mail.google.com" matches an override for "google.com").
@@ -392,14 +401,10 @@ enum AppPolicyStore {
             policy.transcriptViaAX = true
             policy.screenContextCap = chatContextCap
         }
-        let match = userOverrides.first { key, _ in
-            guard key.hasPrefix("domain:") else { return false }
-            let domain = String(key.dropFirst("domain:".count))
-            return host == domain || host.hasSuffix("." + domain)
-        }
-        if let (_, o) = match {
+        if let o = domainOverride(for: host) {
             if let e = o.enabled { policy.isEnabled = e }
             if let m = o.midLineEnabled { policy.allowsMidLine = m }
+            applyContextOverrides(o, to: &policy)
             if !o.customInstructions.isEmpty {
                 policy.customInstructions = policy.customInstructions.isEmpty
                     ? o.customInstructions

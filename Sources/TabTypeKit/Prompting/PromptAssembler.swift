@@ -104,6 +104,9 @@ public struct PromptAssembler: Sendable {
         // its next line; on screen text read by OCR that framing measured worse
         // (author's own writing: chat recall 31.8 → 33.4% without it).
         if let screen, c.isConversation, Self.looksLikeTranscript(screen) {
+            if let clip = clean(c.clipboard, limit: budgets.clipboard) {
+                parts.append("Copied text: \(clip)")
+            }
             // The author's reply is the next line of the conversation.
             return join(parts + [screen + "\n" + speaker(c) + ": " + typed])
         }

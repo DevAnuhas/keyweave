@@ -10,7 +10,11 @@ final class LlamaEngine {
     let models: LlamaModelManager
 
     /// The most recent shown-or-gated result, for the word picker's alternatives.
-    private(set) var lastResult: TabTypeKit.CompletionResult?
+    private var storedResult: TabTypeKit.CompletionResult?
+    private var resultPrivacyRevision: UUID?
+    var lastResult: TabTypeKit.CompletionResult? {
+        resultPrivacyRevision == AppSettings.shared.privacyRevision ? storedResult : nil
+    }
 
     /// Recent results by exact prompt + options: re-typing, deleting back, or a
     /// repeat request for unchanged input is answered without running the model.
@@ -28,6 +32,7 @@ final class LlamaEngine {
     func cancelInFlight() { _ = models.inference.beginRequest() }
 
     func complete(_ request: CompletionRequest) async -> String? {
+        let revision = AppSettings.shared.privacyRevision
         guard let template = models.template, var options = models.decoderOptions else { return nil }
         let text = PromptAssembler(template: template, situationHeader: true).assemble(context(for: request))
 
@@ -41,7 +46,7 @@ final class LlamaEngine {
         // What the author wrote after these words before, if they opted in.
         var hintSupport = 0
         if AppSafetyPolicy.writingEnabled,
-           AppSettings.shared.collectTypingHistory || request.learnsFromWriting,
+           AppSettings.shared.collectTypingHistory && request.learnsFromWriting,
            let hint = PersonalIndex.shared.hint(after: request.beforeCursor) {
             options.hint = Array(hint.text.utf8)
             options.hintBonus = AppSettings.shared.personalization.bonus
@@ -60,11 +65,13 @@ final class LlamaEngine {
             guard let fresh = try? await models.inference.complete(text, options: options, requestID: id) else {
                 return nil   // superseded by a newer keystroke, or not loaded
             }
+            guard AppSettings.shared.privacyRevision == revision else { return nil }
             result = fresh
             cached = false
             remember(fresh, key: cacheKey)
         }
-        lastResult = result
+        storedResult = result
+        resultPrivacyRevision = revision
         let ms = Int(Date().timeIntervalSince(start) * 1000)
         // Measured on the author's own writing (867 cases from their real typing):
         // finishing a half-typed word is right far more often than guessing the
@@ -101,11 +108,14 @@ final class LlamaEngine {
     func clearRecent() {
         recent.removeAll()
         recentOrder.removeAll()
+        storedResult = nil
+        resultPrivacyRevision = nil
     }
 
     /// Words that fit in place of `word`, given the text before it — the word
     /// picker's synonyms for a selection. `base` supplies the screen/app context.
     func synonyms(for word: String, before: String, after: String, base: CompletionRequest?) async -> [String] {
+        let revision = AppSettings.shared.privacyRevision
         guard let template = models.template else { return [] }
         var request = base ?? CompletionRequest(beforeCursor: before, afterCursor: "", screenContext: "", maxWords: 1)
         request.beforeCursor = before
@@ -113,6 +123,7 @@ final class LlamaEngine {
         let id = models.inference.beginRequest()
         let words = (try? await models.inference.replacements(before: text, selected: word, after: after,
                                                                 count: 4, requestID: id)) ?? []
+        guard AppSettings.shared.privacyRevision == revision else { return [] }
         return words.map(\.text)
     }
 

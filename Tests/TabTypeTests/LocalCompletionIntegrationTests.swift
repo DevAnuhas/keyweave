@@ -42,6 +42,11 @@ final class LocalCompletionIntegrationTests: XCTestCase {
         let engine = LlamaEngine(models: models)
         let completion = await engine.complete(.init(
             beforeCursor: "The capital of France is", afterCursor: "", screenContext: "", maxWords: 3))
+        XCTAssertNotNil(engine.lastResult)
+        let clipboardConsent = AppSettings.shared.useClipboardContext
+        AppSettings.shared.useClipboardContext.toggle()
+        XCTAssertNil(engine.lastResult, "A previous context result must become unavailable immediately when consent changes")
+        AppSettings.shared.useClipboardContext = clipboardConsent
         await models.shutdown()
         XCTAssertNotNil(completion)
         XCTAssertTrue(completion?.contains("Paris") == true, "The real application completion path should continue the synthetic sentence: \(completion ?? "<none>")")

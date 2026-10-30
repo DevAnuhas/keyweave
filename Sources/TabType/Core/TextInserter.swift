@@ -5,6 +5,23 @@ import CoreGraphics
 /// keyboard events carrying the Unicode string. This avoids touching the
 /// pasteboard, so the user's clipboard is never disturbed.
 enum TextInserter {
+    private struct ClipboardSession {
+        let token: UUID
+        let changeCount: Int
+        let saved: [[NSPasteboard.PasteboardType: Data]]
+    }
+    @MainActor private static var clipboardSessions: [NSPasteboard.Name: ClipboardSession] = [:]
+
+    /// Insertion's temporary clipboard value is never additional model context.
+    @MainActor
+    static func isTemporaryPasteboardContent(on pasteboard: NSPasteboard = .general) -> Bool {
+        guard let session = clipboardSessions[pasteboard.name] else { return false }
+        guard session.changeCount == pasteboard.changeCount else {
+            clipboardSessions[pasteboard.name] = nil
+            return false
+        }
+        return true
+    }
 
     /// Marker written to each synthesized event's user-data field so our own
     /// `CGEventTap` can recognize and ignore events we injected (otherwise
@@ -81,16 +98,56 @@ enum TextInserter {
     /// ⌘V, then restore the user's clipboard shortly after.
     @MainActor
     private static func paste(_ text: String, matchStyle: Bool = false, backspaceAfter: Bool = false) {
-        let pb = NSPasteboard.general
-        let saved = pb.pasteboardItems?.map { item -> [NSPasteboard.PasteboardType: Data] in
+        paste(text, on: .general, postPaste: {
+            postPasteShortcut(matchStyle: matchStyle, backspaceAfter: backspaceAfter)
+        }, scheduleRestore: { restore in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: restore)
+        })
+    }
+
+    /// The pasteboard and event boundary are injectable so regressions never
+    /// read the user's clipboard or synthesize a real keyboard event.
+    @MainActor
+    static func paste(_ text: String, on pb: NSPasteboard, postPaste: () -> Void,
+                      scheduleRestore: (@escaping @MainActor () -> Void) -> Void) {
+        guard !text.isEmpty else { return }
+        let previousCount = pb.changeCount
+        // Consecutive accepts may overlap their restore delay. Keep the original
+        // user copy, rather than restoring an earlier temporary suggestion.
+        let previous = clipboardSessions[pb.name].flatMap { $0.changeCount == previousCount ? $0 : nil }
+        let saved = previous?.saved ?? pb.pasteboardItems?.map { item -> [NSPasteboard.PasteboardType: Data] in
             var dict: [NSPasteboard.PasteboardType: Data] = [:]
             for type in item.types { if let d = item.data(forType: type) { dict[type] = d } }
             return dict
         } ?? []
 
+        guard pb.changeCount == previousCount else { return }
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        item.setData(Data(), forType: .init("org.nspasteboard.TransientType"))
         pb.clearContents()
-        pb.setString(text, forType: .string)
+        guard pb.writeObjects([item]) else { return }
+        let session = ClipboardSession(token: UUID(), changeCount: pb.changeCount, saved: saved)
+        clipboardSessions[pb.name] = session
 
+        postPaste()
+        scheduleRestore {
+            guard let active = clipboardSessions[pb.name], active.token == session.token else { return }
+            clipboardSessions[pb.name] = nil
+            // A new user copy always wins over our delayed restore.
+            guard pb.changeCount == session.changeCount else { return }
+            pb.clearContents()
+            let restored = saved.map { item in
+                let pbItem = NSPasteboardItem()
+                for (type, data) in item { pbItem.setData(data, forType: type) }
+                return pbItem
+            }
+            if !restored.isEmpty { pb.writeObjects(restored) }
+        }
+    }
+
+    @MainActor
+    private static func postPasteShortcut(matchStyle: Bool, backspaceAfter: Bool) {
         let source = CGEventSource(stateID: .combinedSessionState)
         let vKeyV: CGKeyCode = 0x09
         let flags: CGEventFlags = matchStyle ? [.maskCommand, .maskShift, .maskAlternate] : .maskCommand
@@ -108,15 +165,6 @@ enum TextInserter {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { backspace(count: 1) }
         }
 
-        // Restore the user's clipboard after the paste has been consumed.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            pb.clearContents()
-            for item in saved {
-                let pbItem = NSPasteboardItem()
-                for (type, data) in item { pbItem.setData(data, forType: type) }
-                pb.writeObjects([pbItem])
-            }
-        }
     }
 
     /// Delete `count` characters before the caret via synthesized Backspace presses.

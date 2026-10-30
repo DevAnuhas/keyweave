@@ -1,31 +1,47 @@
 import SwiftUI
+import Combine
 
 /// What KeyWeave is allowed to read for extra context, grouped the way Cotypist's own
 /// Context pane is (Screenshot Settings / Clipboard Settings) rather than folded into
 /// Personalization.
 struct ContextPane: View {
     @EnvironmentObject var settings: AppSettings
+    @State private var screenPermission = false
+    private let permissionPoll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Form {
             Section("Screen Context") {
                 Toggle("Read on-screen context", isOn: $settings.useScreenContext)
-                    .disabled(!AppSafetyPolicy.screenContextEnabled)
-                Text("Additional screen and conversation context is off in this build.")
+                Text("Reads the focused app's eligible window. Supported conversations can use Accessibility; screenshots require Screen Recording permission.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Use screenshots to improve suggestion appearance", isOn: $settings.useScreenshotAppearance)
-                    .disabled(!AppSafetyPolicy.screenshotAppearanceEnabled)
                 Text("Samples the color around the caret so ghost text blends with the field's real text. May occasionally show a Screen Recording indicator in the menu bar.")
                     .font(.caption).foregroundStyle(.secondary)
+                if settings.useScreenContext || settings.useScreenshotAppearance {
+                    HStack {
+                        Text(screenPermission ? "Screen Recording permission granted." : "Screen Recording permission is needed for screenshots.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        if !screenPermission {
+                            Button("Grant Permission…") {
+                                ScreenContextProvider.shared.requestPermission()
+                                screenPermission = ScreenContextProvider.shared.hasPermission()
+                            }
+                        }
+                    }
+                }
             }
             Section("Clipboard Settings") {
                 Toggle("Use clipboard for context", isOn: $settings.useClipboardContext)
-                    .disabled(!AppSafetyPolicy.clipboardContextEnabled)
-                Text("Reads your clipboard to understand what you're working with. Processed locally; never stored or sent anywhere.")
+                Text("Uses recent copied text only for on-device suggestions. No clipboard history is kept.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+        .onReceive(permissionPoll) { _ in
+            screenPermission = ScreenContextProvider.shared.hasPermission()
+        }
     }
 }
 
@@ -236,10 +252,6 @@ struct SyncSection: View {
         Section("Sync between Macs") {
             Toggle("Sync settings and learned writing via iCloud Drive", isOn: Binding(
                 get: { sync.enabled }, set: { sync.enabled = $0 }))
-                .disabled(!AppSafetyPolicy.syncEnabled)
-            if !AppSafetyPolicy.syncEnabled {
-                Text("Sync is off in this build.").font(.caption).foregroundStyle(.secondary)
-            }
             if sync.enabled {
                 HStack {
                     SecureField(sync.hasPassphrase ? "Passphrase set — enter a new one to change it" : "Sync passphrase",
@@ -266,8 +278,7 @@ struct PersonalizationPane: View {
             SyncSection()
             Section("Learn from your writing") {
                 Toggle("Learn from what I write", isOn: $settings.collectTypingHistory)
-                    .disabled(!AppSafetyPolicy.writingEnabled)
-                Text("KeyWeave keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
+                Text("Learns your phrasing from eligible text fields. Common secret patterns are filtered before encrypted local storage. Per-app controls can exclude writing. If you also enable iCloud sync, your learned writing syncs encrypted between your Macs.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Personalization strength", selection: $settings.personalizationStrength) {
                     Text("Gentle").tag("gentle")
@@ -278,7 +289,7 @@ struct PersonalizationPane: View {
                 Text("How strongly your own past phrasing steers suggestions.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Record text even when you accept no suggestion", isOn: $settings.recordWithoutAccepts)
-                    .disabled(!AppSafetyPolicy.writingEnabled)
+                    .disabled(!settings.collectTypingHistory)
                 Text("Off: KeyWeave only learns from messages where you used at least one suggestion.")
                     .font(.caption).foregroundStyle(.secondary)
                 LearnedWritingRow()
@@ -469,17 +480,24 @@ private struct LearnedWritingRow: View {
     @State private var confirming = false
 
     var body: some View {
-        HStack {
-            Text(store.documentCount == 0
-                 ? "Nothing learned yet."
-                 : "Learned from \(store.documentCount) pieces of writing (\(ByteCountFormatter.string(fromByteCount: Int64(store.characterCount), countStyle: .file))).")
-                .font(.callout).foregroundStyle(.secondary)
-            Spacer()
-            Button("Erase…", role: .destructive) { confirming = true }
-                .disabled(store.documentCount == 0)
+        VStack(alignment: .leading) {
+            HStack {
+                Text(store.documentCount == 0
+                     ? "Nothing learned yet."
+                     : "Learned from \(store.documentCount) pieces of writing (\(ByteCountFormatter.string(fromByteCount: Int64(store.characterCount), countStyle: .file))).")
+                    .font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Button("Erase…", role: .destructive) { confirming = true }
+            }
+            if !store.status.isEmpty {
+                Text(store.status).font(.caption).foregroundStyle(.secondary)
+            }
         }
         .confirmationDialog("Erase everything KeyWeave learned from your writing?", isPresented: $confirming) {
-            Button("Erase", role: .destructive) { store.eraseAll() }
+            Button("Erase", role: .destructive) {
+                store.eraseAll()
+                NotificationCenter.default.post(name: .tabTypePrivacyChanged, object: nil)
+            }
         }
     }
 }

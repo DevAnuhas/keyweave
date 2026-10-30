@@ -35,13 +35,14 @@ extension AppSettings {
             escapeBehavior: escapeBehavior, autocorrectLanguage: autocorrectLanguage,
             batteryOnDemandOnly: batteryOnDemandOnly, batteryShorterCompletions: batteryShorterCompletions,
             batterySmallerModel: batterySmallerModel,
-            useScreenContext: useScreenContext, useClipboardContext: useClipboardContext,
-            useScreenshotAppearance: useScreenshotAppearance,
+            // Device consent never travels with ordinary writing preferences.
+            useScreenContext: false, useClipboardContext: false,
+            useScreenshotAppearance: false,
             completionLength: completionLength, authorName: authorName, writingStyle: writingStyle,
             customInstructions: customInstructions,
             alternativesAfterDelay: alternativesAfterDelay, synonymsAfterDelay: synonymsAfterDelay, labsDelay: labsDelay,
             personalizationStrength: personalizationStrength,
-            recordWithoutAccepts: recordWithoutAccepts, collectTypingHistory: collectTypingHistory,
+            recordWithoutAccepts: false, collectTypingHistory: false,
             disabledDomains: disabledDomains, appOverrides: appOverrides)
     }
 
@@ -57,16 +58,26 @@ extension AppSettings {
         escapeBehavior = s.escapeBehavior; autocorrectLanguage = s.autocorrectLanguage
         batteryOnDemandOnly = s.batteryOnDemandOnly; batteryShorterCompletions = s.batteryShorterCompletions
         batterySmallerModel = s.batterySmallerModel
-        useScreenContext = AppSafetyPolicy.screenContextEnabled && s.useScreenContext
-        useClipboardContext = AppSafetyPolicy.clipboardContextEnabled && s.useClipboardContext
-        useScreenshotAppearance = AppSafetyPolicy.screenshotAppearanceEnabled && s.useScreenshotAppearance
+        // Screen, clipboard, capture and learning consent remain local even
+        // when an older peer includes those fields in its settings payload.
         completionLength = s.completionLength; authorName = s.authorName; writingStyle = s.writingStyle
         customInstructions = s.customInstructions
         alternativesAfterDelay = s.alternativesAfterDelay; synonymsAfterDelay = s.synonymsAfterDelay
         labsDelay = s.labsDelay
         personalizationStrength = s.personalizationStrength
-        recordWithoutAccepts = AppSafetyPolicy.writingEnabled && s.recordWithoutAccepts
-        collectTypingHistory = AppSafetyPolicy.writingEnabled && s.collectTypingHistory
-        disabledDomains = s.disabledDomains; appOverrides = s.appOverrides
+        disabledDomains.formUnion(s.disabledDomains)
+        var merged = s.appOverrides
+        for key in Set(merged.keys).union(appOverrides.keys) {
+            let local = appOverrides[key]
+            if var incoming = merged[key] {
+                incoming.readConversation = local?.readConversation
+                incoming.learnFromWriting = local?.learnFromWriting
+                if local?.enabled == false { incoming.enabled = false }
+                merged[key] = incoming
+            } else if let local {
+                merged[key] = local
+            }
+        }
+        appOverrides = merged
     }
 }

@@ -4,11 +4,11 @@ A free, local-first macOS writing assistant forked from [TabType](https://github
 
 ## Current state
 
-- Current version: `2.2.2` / build `15`, with the product name **KeyWeave** throughout the app and installer. Native tests and ordinary installed launch/Settings reopening pass; distribution uses Developer ID signing and notarization.
+- Current version: `2.3.0` / build `16`, restoring opt-in login, context, learning and encrypted iCloud Drive sync. Persistent identity and storage namespaces stay unchanged.
 - The installed `2.2.1` launch and core suggestions were confirmed working by the user. Startup opens Setup, requires its own Accessibility grant, and loads only an installed local model; downloads remain explicit.
-- Screen/clipboard context, screenshot appearance capture, writing memory, sync, login registration and automatic updates remain disabled. Instructions, mid-line completion, alternatives and synonyms are retained; full Pro/Labs parity is unfinished.
+- Optional services require their local controls; defaults remain off. App/domain exclusions and secure fields constrain acquisition, and consent changes invalidate in-flight/cached results. Sync cannot grant privacy consent from another Mac. Automatic app updates, remote catalog refresh and model-download resume remain disabled. Full Pro/Labs parity is unfinished.
 - Bundle/preferences ID `dev.anuhas.keyweave` and isolated storage, Keychain and iCloud namespaces stay unchanged. Never automatically access or migrate TabType/Cotypist data.
-- Before enabling optional services, fix capture app/window identity, clipboard ownership, stale picker selections and sync deletion behavior. Live AX/OCR and cross-Mac sync remain unverified.
+- Captures bind to a specific window/field, clipboard restoration preserves newer copies, and erasure generations prevent stale sync payloads restoring deleted writing. Synthetic two-peer sync tests do not establish live cross-Mac iCloud delivery; broad host compatibility and remaining picker behavior still need verification.
 
 ## References
 

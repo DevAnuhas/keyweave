@@ -130,25 +130,29 @@ final class Engine {
     /// The last AX-read field text per app — the reliable source for committed
     /// messages. The keystroke fallback `buffer` is lossy (missed keystrokes,
     /// send-by-click boundaries) and used to glue messages together mid-word.
-    private var lastAXInput: (bundleId: String, text: String, windowTitle: String)?
+    private var lastAXInput: (bundleId: String, text: String, windowTitle: String, host: String?)?
 
-    /// Whether to learn from writing in `bundleId`: the per-app choice, else the
-    /// global "learn from my writing" setting.
-    func learnsFromWriting(_ bundleId: String) -> Bool {
-        AppSafetyPolicy.writingEnabled &&
-            (AppPolicyStore.userOverrides[bundleId]?.learnFromWriting ?? settings.collectTypingHistory)
+    /// A per-app choice can narrow global consent, never grant it.
+    func learnsFromWriting(_ bundleId: String, host: String? = nil) -> Bool {
+        guard AppSafetyPolicy.writingEnabled, settings.collectTypingHistory,
+              AppPolicyStore.policy(forBundleId: bundleId, host: host).isEnabled else { return false }
+        if let host, settings.disabledDomains.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
+            return false
+        }
+        return AppPolicyStore.domainOverride(for: host)?.learnFromWriting
+            ?? AppPolicyStore.userOverrides[bundleId]?.learnFromWriting ?? true
     }
 
-    /// Effective consent includes the build gate, even for forced app recipes.
+    /// Chat recipes cannot override the global context opt-out.
     func usesScreenContext(for policy: AppPolicy) -> Bool {
-        AppSafetyPolicy.screenContextEnabled &&
-            (settings.useScreenContext || policy.forceScreenContext) && policy.includesScreenContext
+        AppSafetyPolicy.screenContextEnabled && settings.useScreenContext &&
+            policy.isEnabled && policy.includesScreenContext
     }
 
     /// Keep the text written in the field being left (a draft, email, note…).
     private func recordFieldWriting() {
         defer { acceptedInCurrentText = false }
-        guard let ax = lastAXInput, learnsFromWriting(ax.bundleId) else { return }
+        guard let ax = lastAXInput, learnsFromWriting(ax.bundleId, host: ax.host) else { return }
         guard settings.recordWithoutAccepts || acceptedInCurrentText else { return }
         WritingStore.shared.record(ax.text, bundleId: ax.bundleId, fieldKey: ax.windowTitle, kind: .field)
     }
@@ -162,6 +166,7 @@ final class Engine {
     private func commitRecentInput(bundleId: String?) {
         guard let bundleId else { return }
         var text = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let eligibleWriting = lastAXInput.flatMap { $0.bundleId == bundleId ? $0 : nil }
         if let ax = lastAXInput, ax.bundleId == bundleId {
             let axText = ax.text.trimmingCharacters(in: .whitespacesAndNewlines)
             // The AX snapshot wins unless the buffer strictly extends it (a few
@@ -170,14 +175,17 @@ final class Engine {
         }
         lastAXInput = nil
         guard text.count >= 4 else { return }
-        if learnsFromWriting(bundleId), settings.recordWithoutAccepts || acceptedInCurrentText {
-            WritingStore.shared.record(text, bundleId: bundleId, fieldKey: nil, kind: .message)
+        // Only snapshots read after the secure-field/app/domain checks are
+        // eligible for learning. An unvalidated keystroke buffer never is.
+        if let eligibleWriting, learnsFromWriting(bundleId, host: eligibleWriting.host),
+           settings.recordWithoutAccepts || acceptedInCurrentText {
+            WritingStore.shared.record(eligibleWriting.text, bundleId: bundleId, fieldKey: nil, kind: .message)
         }
         acceptedInCurrentText = false
-        if AppSafetyPolicy.writingEnabled {
+        if let eligibleWriting, learnsFromWriting(bundleId, host: eligibleWriting.host) {
             var list = recentInputs[bundleId] ?? []
-            if list.last != text {
-                list.append(SecretSanitizer.sanitize(String(text.suffix(300))))
+            if list.last != eligibleWriting.text {
+                list.append(SecretSanitizer.sanitize(String(eligibleWriting.text.suffix(300))))
                 if list.count > 3 { list.removeFirst(list.count - 3) }
                 recentInputs[bundleId] = list
             }
@@ -228,6 +236,14 @@ final class Engine {
     private var clipboardFirstSeen = Date.distantPast
 
     private(set) var isRunning = false
+    private struct PrivacyRevision: Equatable {
+        let settings: UUID
+        let local: UUID
+    }
+    private var localPrivacyRevision = UUID()
+    private var privacyRevision: PrivacyRevision {
+        PrivacyRevision(settings: settings.privacyRevision, local: localPrivacyRevision)
+    }
 
     init(settings: AppSettings = .shared,
          accessibilityTrusted: @escaping @MainActor () -> Bool = { AccessibilityBridge.isTrusted() }) {
@@ -235,6 +251,34 @@ final class Engine {
         self.accessibilityTrusted = accessibilityTrusted
         self.router = EngineRouter()
         self.inlineCommand = InlineCommandController(settings: settings)
+    }
+
+    /// Drop work built with a previous consent state, including already visible
+    /// suggestions and cached context. Changing a setting never requests access.
+    func optionalFeaturesDidChange() {
+        localPrivacyRevision = UUID()
+        prewarmTask?.cancel()
+        pauseCapture?.cancel()
+        pauseCapture = nil
+        lockedContext = nil
+        recentInputs.removeAll()
+        lastAXInput = nil
+        lastReq = nil
+        lastPredictedPrompt = ""
+        lastPrewarmKey = nil
+        inFlight = nil
+        deferredWhileInFlight = false
+        lookahead = nil
+        baselineAdjust.removeAll()
+        fieldFamily.removeAll()
+        familyTried.removeAll()
+        clipboardChangeCount = -1
+        clipboardFirstSeen = .distantPast
+        ScreenContextProvider.shared.invalidate()
+        FieldFitCache.shared.invalidate()
+        GhostAppearanceProbe.shared.invalidate()
+        router.llama.clearRecent()
+        clearSuggestion()
     }
 
     /// Start monitoring. Returns false if the event tap couldn't be created
@@ -251,7 +295,7 @@ final class Engine {
         installFreshContextRekick()
         // Whatever is on the pasteboard at launch predates this session — treat it
         // as stale so it never enters a prompt (only copies made from now on do).
-        if AppSafetyPolicy.clipboardContextEnabled {
+        if AppSafetyPolicy.clipboardContextEnabled && settings.useClipboardContext {
             clipboardChangeCount = NSPasteboard.general.changeCount
         }
         clipboardFirstSeen = .distantPast
@@ -442,21 +486,31 @@ final class Engine {
     /// Input-tail prefill instead of the whole prompt. The 1-token result is
     /// discarded; runs only when idle and skipped in Low Power Mode.
     private func schedulePrewarm(policy: AppPolicy) {
-        guard settings.isEnabled, !PowerMonitor.shared.isLowPower else { return }
         prewarmTask?.cancel()
+        guard settings.isEnabled, policy.isEnabled, !PowerMonitor.shared.isLowPower else { return }
+        let revision = privacyRevision
         prewarmTask = Task { [weak self] in
             // Let the focus-change screen capture land first (throttle is 1.5s, a
             // capture kicked just above typically completes well inside 0.8s).
             try? await Task.sleep(nanoseconds: 800_000_000)
-            guard let self, !Task.isCancelled else { return }
+            guard let self, !Task.isCancelled, self.privacyRevision == revision,
+                  self.isRunning, self.settings.isEnabled, self.accessibilityTrusted() else { return }
             // Only when idle — never compete with a real prediction.
             guard self.currentSuggestion == nil, self.buffer.isEmpty else { return }
             let bid = AccessibilityBridge.frontmostBundleId()
+            let host = AccessibilityBridge.frontmostURLHost()
+            let policy = AppPolicyStore.policy(forBundleId: bid, host: host)
+            guard policy.isEnabled,
+                  host.map({ host in !self.settings.disabledDomains.contains { host == $0 || host.hasSuffix("." + $0) } }) ?? true,
+                  let focused = AccessibilityBridge.focusedElement(),
+                  !AccessibilityBridge.isSecureField(focused),
+                  !AccessibilityBridge.isCredentialField(focused),
+                  self.allowedByChatPanelPolicy(policy, element: focused, bundleId: bid) else { return }
             let screenCap = policy.screenContextCap ?? AppPolicyStore.defaultContextCap
             let screenEnabled = self.usesScreenContext(for: policy)
             let screen = screenEnabled
                 ? ScreenContextProvider.shared.contextText(for: bid, cap: screenCap) : ""
-            let key = (bid ?? "") + "|" + String(screen.hashValue)
+            let key = (bid ?? "") + "|" + (host ?? "") + "|" + String(screen.hashValue)
             guard key != self.lastPrewarmKey else { return }   // context unchanged
             self.lastPrewarmKey = key
             var req = CompletionRequest(
@@ -528,9 +582,10 @@ final class Engine {
     private func showSynonyms(for word: String, before: String, after: String, llama: LlamaEngine,
                               caretRect: CGRect?) {
         let base = lastReq
+        let revision = privacyRevision
         Task { [weak self] in
             let words = await llama.synonyms(for: word, before: before, after: after, base: base)
-            guard let self else { return }
+            guard let self, self.privacyRevision == revision else { return }
             guard !words.isEmpty else {
                 Log.shared.debug("synonyms: none for \"\(word)\"")
                 return
@@ -638,8 +693,9 @@ final class Engine {
     }
 
     func stop() {
+        recordFieldWriting()
         monitor.stop()
-        clearSuggestion()
+        optionalFeaturesDidChange()
         if let workspaceObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(workspaceObserver)
             self.workspaceObserver = nil
@@ -1415,8 +1471,7 @@ final class Engine {
         }
 
         // Screen memory (throttled, off the typing path), unless this app opts out or
-        // we're conserving battery. Chat/messaging apps force this on regardless of
-        // the global toggle — reading recent conversation is the whole point there.
+        // we're conserving battery. App recipes never override global consent.
         let screenContextEnabled = usesScreenContext(for: policy)
         if screenContextEnabled && !PowerMonitor.shared.shouldPauseCapture {
             ScreenContextProvider.shared.refreshIfStale()
@@ -1554,7 +1609,15 @@ final class Engine {
 
         // Remember the field's AX text — commitRecentInput reads this when the
         // message is sent (the keystroke buffer alone is lossy).
-        if let bid = bundleId, !ctx.input.isEmpty { lastAXInput = (bid, ctx.input, ctx.windowTitle) }
+        let writingSnapshot = policy.terminalAgentOnly
+            ? ctx.writingSnapshot.flatMap { TerminalPrompt.input(before: $0) }
+            : ctx.writingSnapshot
+        if let bid = bundleId, learnsFromWriting(bid, host: host),
+           let snapshot = writingSnapshot, !snapshot.isEmpty {
+            lastAXInput = (bid, snapshot, ctx.windowTitle, host)
+        } else {
+            lastAXInput = nil
+        }
 
         // Skip redundant work if nothing changed since the last prediction.
         if ctx.dedupKey == lastPredictedPrompt { return }
@@ -1583,13 +1646,14 @@ final class Engine {
         applyWriterContext(&req, appName: frontApp, policy: policy)
         req.windowTitle = ctx.windowTitle
         req.fieldPlaceholder = ctx.placeholder
-        req.learnsFromWriting = bundleId.map(learnsFromWriting) ?? false
+        req.learnsFromWriting = bundleId.map { learnsFromWriting($0, host: host) } ?? false
         lastReq = req   // word-alternatives regeneration basis
         Log.shared.debug("predict app=\(bundleId ?? "?") engine=\(engine.displayName) focused=\(ctx.focused != nil) screenCtx=\(screenContext.count) inputTail=\"\(String(ctx.input.suffix(40)))\"")
         let startedAt = DispatchTime.now()
+        let revision = privacyRevision
 
         Task { [weak self] in
-            guard let self else { return }
+            guard let self, self.privacyRevision == revision else { return }
             // Completing a misspelling is never what the user wants — skip the
             // generation while the word being typed looks like a typo (opt-out via
             // Settings ▸ Text Tools). Like Cotypist, only the CURRENT word counts:
@@ -1597,21 +1661,26 @@ final class Engine {
             // also be 4+ letters, lowercase, and not the start of any word on
             // screen or earlier in the text.
             if self.settings.skipOnTypo, let (token, isPartial) = Engine.typoCheckToken(ctx.input),
-               isPartial, Engine.partialMayBeTypo(token, context: ctx.input + "\n" + screenContext),
-               await SpellChecker.shared.isLikelyTypo(
-                   word: token, isPartial: isPartial, language: self.settings.autocorrectLanguage) {
-                Log.shared.debug("predict -> (typo before caret, skipped: \"\(token)\")")
-                Statistics.shared.record(.gatedTypo)
-                return
+               isPartial, Engine.partialMayBeTypo(token, context: ctx.input + "\n" + screenContext) {
+                let typo = await SpellChecker.shared.isLikelyTypo(
+                    word: token, isPartial: isPartial, language: self.settings.autocorrectLanguage)
+                guard self.privacyRevision == revision else { return }
+                if typo {
+                    Log.shared.debug("predict -> (typo before caret, skipped: \"\(token)\")")
+                    Statistics.shared.record(.gatedTypo)
+                    return
+                }
             }
+            guard self.privacyRevision == revision else { return }
             Statistics.shared.record(.requested)
             self.inFlightCounter += 1
             let id = self.inFlightCounter
             self.inFlight = (ctx.input, id)
             let raw = await engine.complete(req)
+            guard self.privacyRevision == revision else { return }
             if self.inFlight?.id == id { self.inFlight = nil }
             await self.handlePredictionResult(
-                raw: raw, req: req, ctxInput: ctx.input, policy: policy, startedAt: startedAt)
+                raw: raw, req: req, ctxInput: ctx.input, policy: policy, startedAt: startedAt, revision: revision)
             // Typing that waited on this generation: if the splice didn't produce
             // a ghost, predict for what's in the field now.
             if self.deferredWhileInFlight, self.inFlight == nil {
@@ -1669,7 +1738,8 @@ final class Engine {
     /// after-cursor duplicate trim, staleness/remainder/repeat checks via the
     /// session, then presentation.
     private func handlePredictionResult(raw: String?, req: CompletionRequest, ctxInput: String,
-                                        policy: AppPolicy, startedAt: DispatchTime) async {
+                                        policy: AppPolicy, startedAt: DispatchTime, revision: PrivacyRevision) async {
+        guard privacyRevision == revision else { return }
         let elapsedMs = (DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
         if settings.verboseLog {
             Log.shared.debug("predict raw model output (pre-post-processing): \(raw.map { "\"\($0)\"" } ?? "nil")")
@@ -1759,9 +1829,12 @@ final class Engine {
         let entry = Lookahead(after: suggestion, input: input + suggestion, request: ahead, text: nil)
         lookahead = entry
         let engine = router.current
+        let revision = privacyRevision
         Task { [weak self] in
+            guard let self, self.privacyRevision == revision else { return }
             let text = await engine.complete(ahead)
-            guard let self, self.lookahead?.input == entry.input, self.lookahead?.after == suggestion else { return }
+            guard self.privacyRevision == revision, self.lookahead?.input == entry.input,
+                  self.lookahead?.after == suggestion else { return }
             self.lookahead?.text = text ?? ""
             if let text { Log.shared.debug("lookahead: after \"\(suggestion)\" → \"\(text)\"") }
         }
@@ -2141,6 +2214,7 @@ final class Engine {
     private func freshClipboardText() -> String {
         guard AppSafetyPolicy.clipboardContextEnabled, settings.useClipboardContext else { return "" }
         let pb = NSPasteboard.general
+        guard !TextInserter.isTemporaryPasteboardContent(on: pb) else { return "" }
         if pb.changeCount != clipboardChangeCount {
             clipboardChangeCount = pb.changeCount
             clipboardFirstSeen = Date()
@@ -2150,7 +2224,7 @@ final class Engine {
         guard !text.isEmpty else { return "" }
         let letters = text.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
         guard Double(letters) / Double(text.count) >= 0.6 else { return "" }
-        return text
+        return SecretSanitizer.sanitize(text)
     }
 
     private func updateAccessoryButton() {
