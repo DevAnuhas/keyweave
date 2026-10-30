@@ -3,27 +3,27 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Keyweave</string>
+	<string>KeyWeaver</string>
 	<key>CFBundleExecutable</key>
-	<string>Keyweave</string>
+	<string>KeyWeaver</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.anuhas.keyweave</string>
 	<key>CFBundleName</key>
-	<string>Keyweave</string>
+	<string>KeyWeaver</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.1.0</string>
+	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
-	<string>11</string>
+	<string>12</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Keyweave inserts accepted suggestions into the app you're typing in.</string>
+	<string>KeyWeaver inserts accepted suggestions into the app you're typing in.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT Licensed. TabType contributors.</string>
 </dict>

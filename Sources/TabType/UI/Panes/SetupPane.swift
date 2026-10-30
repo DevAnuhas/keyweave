@@ -13,7 +13,7 @@ struct SetupPane: View {
     private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var modelReady: Bool { models.isLoaded }
-    private var allSet: Bool { trusted && modelReady }
+    private var allSet: Bool { AppSafetyPolicy.inputMonitoringEnabled && trusted && modelReady }
 
     var body: some View {
         Form {
@@ -23,10 +23,10 @@ struct SetupPane: View {
                         .font(.title2)
                         .foregroundStyle(allSet ? .green : .secondary)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(allSet ? "All set!" : "Finish setup").font(.headline)
-                        Text(allSet
-                             ? "Keyweave is ready to use. Start typing in any app and press Tab to accept a suggestion."
-                             : "Complete the steps below to start getting suggestions.")
+                        Text(AppSafetyPolicy.inputMonitoringEnabled ? (allSet ? "All set!" : "Finish setup") : "KeyWeaver Preview").font(.headline)
+                        Text(AppSafetyPolicy.inputMonitoringEnabled
+                             ? (allSet ? "KeyWeaver is ready to use. Start typing in any app and press Tab to accept a suggestion." : "Complete the steps below to start getting suggestions.")
+                             : "Suggestions and input monitoring are disabled in this preview. You can inspect Settings without granting permissions or downloading a model.")
                             .font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -37,10 +37,10 @@ struct SetupPane: View {
 
             Section {
                 statusRow(
-                    ok: trusted, title: "Accessibility permission",
-                    detail: "Required — lets Keyweave read the field you're typing in and insert completions.",
-                    action: (trusted ? nil : ("Grant", { _ = AccessibilityBridge.requestTrust() })),
-                    doneLabel: "Granted")
+                    ok: !AppSafetyPolicy.inputMonitoringEnabled || trusted, title: "Accessibility permission",
+                    detail: AppSafetyPolicy.inputMonitoringEnabled ? "Required — lets KeyWeaver read the field you're typing in and insert completions." : "Not needed while suggestions are disabled in this preview.",
+                    action: (!AppSafetyPolicy.inputMonitoringEnabled || trusted ? nil : ("Grant", { _ = AccessibilityBridge.requestTrust() })),
+                    doneLabel: AppSafetyPolicy.inputMonitoringEnabled ? "Granted" : "Not needed")
 
                 statusRow(
                     ok: screenOK, title: "Screen Recording permission",
@@ -50,14 +50,14 @@ struct SetupPane: View {
 
                 modelRow
 
-                Text("Manage macOS text suggestions in System Settings. Keyweave does not change that preference.")
+                Text("Manage macOS text suggestions in System Settings. KeyWeaver does not change that preference.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Optional") {
                 Toggle("Use clipboard as context", isOn: $settings.useClipboardContext)
                     .disabled(!AppSafetyPolicy.clipboardContextEnabled)
-                Text("When on, Keyweave reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
+                Text("When on, KeyWeaver reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

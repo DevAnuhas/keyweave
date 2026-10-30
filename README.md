@@ -1,19 +1,32 @@
-# Keyweave
+<p align="center"><img src="Resources/Branding/KeyWeaverIcon.png" alt="KeyWeaver app icon" width="160"></p>
 
-A working-name fork of [TabType](https://github.com/nilava/TabType), focused on verified Cotypist feature parity, macOS compatibility and reliable local autocomplete. Free and MIT-licensed; upstream attribution remains intact.
+# KeyWeaver
 
-**Status: bootstrap/research. There is no Keyweave app release yet.** The inherited source still builds and identifies itself as TabType. Do not run it against real user data before completing the identity, storage and updater isolation below.
+An open-source, on-device macOS writing assistant, built from [TabType](https://github.com/nilava/TabType). The application code is MIT-licensed, with upstream attribution preserved. Bundled runtime, fonts, emoji and dictionary data retain their own included notices and licenses.
 
-Start here:
-- [Project context and exact upstream baseline](CONTEXT.md)
-- [Working rules](AGENTS.md)
-- [Milestone and Mac acceptance](docs/MILESTONE.md)
-- [First code slice: fork identity and update ownership](docs/FORK-IDENTITY.md)
-- [Research sources](docs/research/README.md)
-- [REA investigation workflow](docs/REA-WORKFLOW.md)
-- [t3code starter prompt](docs/handoffs/t3code-start.md)
-- [Cotypist release-history coverage and gaps](docs/research/COTYPIST-HISTORY.md)
-- [Branch and review conventions](docs/WORKFLOW.md)
+**0.1.0 is an isolation and interface preview. Suggestions and input monitoring are disabled.** Screen/clipboard context, writing memory, sync, login registration and automatic app/model updates are also off. No model download or Accessibility/Screen Recording permission is needed to inspect the preview. This is not a Cotypist-parity release or a working daily autocomplete build.
+
+[Download the preview](https://github.com/DevAnuhas/keyweave/releases/tag/v0.1.0-preview.1) · [Release checks and packaging](docs/runbooks/releasing.md) · [Implementation evidence](docs/README.md)
+
+Requires Apple Silicon and macOS 14 or later. Download the arm64 DMG or ZIP, check `SHA256SUMS.txt`, and drag `KeyWeaver.app` into Applications. Model files are not included. Existing TabType/Cotypist stores are never automatically imported or migrated.
+
+## Identity and artwork
+
+KeyWeaver uses `dev.anuhas.keyweave`, with its own preferences, storage, caches, Keychain service and cloud namespace. The stable internal storage folders retain the earlier Keyweave spelling. Internal Swift targets remain `TabType`/`TabTypeKit`.
+
+The new app icon, matching logo mark and template menu-bar image were generated for KeyWeaver using Cotypist's public icon as visual inspiration. The final artwork and exact generation prompts are in [Resources/Branding](Resources/Branding/README.md). No Cotypist asset is distributed in this repository.
+
+## Develop
+
+```sh
+Scripts/test.sh
+Scripts/generate-brand-assets.sh
+Scripts/build.sh app
+```
+
+The native test runner needs the pinned llama XCFramework already cached. First-time dependency resolution downloads a binary artifact; provision that separately. `build.sh` produces a local development bundle by default. A distribution build requires an explicit Developer ID identity and team, followed by successful notarization/stapling; see the [release runbook](docs/runbooks/releasing.md).
+
+Start with [CONTEXT.md](CONTEXT.md), [working rules](AGENTS.md), the [documentation index](docs/README.md), and the [research coverage](docs/research/README.md). Inherited feature implementations remain in place; they are not evidence of enabled or verified feature parity.
 
 ## Inherited upstream README
 

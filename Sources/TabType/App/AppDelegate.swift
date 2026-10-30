@@ -89,8 +89,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: ProductIdentity.name)
-            button.image?.isTemplate = true
+            button.image = BrandAssets.menuBarIcon()
+            button.setAccessibilityLabel(ProductIdentity.name)
         }
         statusItem.isVisible = settings.showMenuBarIcon
         statusMenu.delegate = self
@@ -153,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         menu.addItem(item("Settings…", icon: "gearshape", action: #selector(openSettings), key: ","))
         menu.addItem(item("Statistics", icon: "chart.bar", action: #selector(openStatistics)))
 
-        if !AccessibilityBridge.isTrusted() {
+        if AppSafetyPolicy.inputMonitoringEnabled && !AccessibilityBridge.isTrusted() {
             menu.addItem(item("Grant Accessibility Permission…", icon: "exclamationmark.triangle",
                               action: #selector(showOnboarding)))
         }
@@ -224,6 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func statusLine() -> String {
+        guard AppSafetyPolicy.inputMonitoringEnabled else { return "\(ProductIdentity.name) Preview — suggestions are off" }
         let name = { (id: String) in self.llamaModels.entry(id: id)?.name ?? id }
         switch llamaModels.status {
         case .noModel: return "No model yet — choose one in Settings ▸ Model"

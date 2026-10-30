@@ -11,14 +11,16 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "text.cursor")
-                .font(.system(size: 40))
-                .foregroundStyle(.tint)
-                .padding(.top, 4)
+            if let icon = BrandAssets.appIcon() {
+                Image(nsImage: icon)
+                    .resizable().interpolation(.high)
+                    .frame(width: 72, height: 72)
+                    .padding(.top, 4)
+            }
 
-            Text("Welcome to Keyweave").font(.title).bold()
+            Text("Welcome to KeyWeaver").font(.title).bold()
 
-            Text("Free, on-device autocomplete for macOS. As you type, Keyweave suggests your next words — press Tab to accept. Nothing leaves your Mac.")
+            Text("An early preview of on-device autocomplete for macOS. Suggestions and input monitoring are disabled in this preview.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -28,17 +30,17 @@ struct OnboardingView: View {
 
             permissionRow(
                 ok: trusted,
-                title: "Accessibility (required)",
-                detail: "Lets Keyweave read the field you're typing in and insert accepted suggestions.",
+                title: AppSafetyPolicy.inputMonitoringEnabled ? "Accessibility (required)" : "Accessibility",
+                detail: AppSafetyPolicy.inputMonitoringEnabled ? "Lets KeyWeaver read the field you're typing in and insert accepted suggestions." : "Not needed while suggestions are disabled in this preview.",
                 buttonTitle: "Grant Accessibility",
                 action: onGrant)
 
-            Text("Screen context, writing memory and sync are off in this build.")
+            Text("Screen context, writing memory and sync are also off. You do not need to grant permissions to inspect this preview.")
                 .font(.callout).foregroundStyle(.secondary)
 
             Button("Get Started") { onDone() }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!trusted)
+                .disabled(AppSafetyPolicy.inputMonitoringEnabled && !trusted)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
         }
@@ -61,7 +63,7 @@ struct OnboardingView: View {
                 Text(title).fontWeight(.medium)
                 Text(detail).font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if !ok {
+                if !ok && AppSafetyPolicy.inputMonitoringEnabled {
                     Button(buttonTitle, action: action).padding(.top, 2)
                 }
             }

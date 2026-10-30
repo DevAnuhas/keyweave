@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What Keyweave is allowed to read for extra context, grouped the way Cotypist's own
+/// What KeyWeaver is allowed to read for extra context, grouped the way Cotypist's own
 /// Context pane is (Screenshot Settings / Clipboard Settings) rather than folded into
 /// Personalization.
 struct ContextPane: View {
@@ -117,7 +117,7 @@ struct ShortcutsPane: View {
                 KeyRecorderRow(title: "Word alternatives", binding: $settings.wordAlternativesKey)
                 KeyRecorderRow(title: "Force a suggestion", binding: $settings.forceActivateKey)
                 KeyRecorderRow(title: "Pause in current app (5 min)", binding: $settings.appPauseKey)
-                KeyRecorderRow(title: "Enable/disable Keyweave", binding: $settings.toggleKey, allowNone: true)
+                KeyRecorderRow(title: "Enable/disable KeyWeaver", binding: $settings.toggleKey, allowNone: true)
                 Text("Hold ⌥ with the accept key to send the real key to the app (e.g. ⌥Tab moves between form fields while a suggestion is shown).")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -267,7 +267,7 @@ struct PersonalizationPane: View {
             Section("Learn from your writing") {
                 Toggle("Learn from what I write", isOn: $settings.collectTypingHistory)
                     .disabled(!AppSafetyPolicy.writingEnabled)
-                Text("Keyweave keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
+                Text("KeyWeaver keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Personalization strength", selection: $settings.personalizationStrength) {
                     Text("Gentle").tag("gentle")
@@ -279,7 +279,7 @@ struct PersonalizationPane: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Record text even when you accept no suggestion", isOn: $settings.recordWithoutAccepts)
                     .disabled(!AppSafetyPolicy.writingEnabled)
-                Text("Off: Keyweave only learns from messages where you used at least one suggestion.")
+                Text("Off: KeyWeaver only learns from messages where you used at least one suggestion.")
                     .font(.caption).foregroundStyle(.secondary)
                 LearnedWritingRow()
             }
@@ -400,7 +400,7 @@ struct UpdatesSection: View {
     var body: some View {
         Section("Updates") {
             LabeledContent("Version", value: updater.currentVersion)
-            Text("App updates are disabled until Keyweave has its own distribution and publisher verification.")
+            Text("Automatic updates are disabled in this preview. Download new versions from the KeyWeaver GitHub releases page.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -412,11 +412,14 @@ struct AboutPane: View {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 10) {
-                        Image(systemName: "text.cursor")
-                            .font(.system(size: 28)).foregroundStyle(.tint)
+                        if let icon = BrandAssets.appIcon() {
+                            Image(nsImage: icon)
+                                .resizable().interpolation(.high)
+                                .frame(width: 48, height: 48)
+                        }
                         VStack(alignment: .leading) {
-                            Text("Keyweave").font(.title2).bold()
-                            Text("Free, open-source, on-device autocomplete for macOS.")
+                            Text("KeyWeaver").font(.title2).bold()
+                            Text("An early preview of open-source, on-device autocomplete for macOS.")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                     }
@@ -432,7 +435,7 @@ struct AboutPane: View {
                       systemImage: "key.slash")
             }
             Section("Open source") {
-                Text("Keyweave is an MIT-licensed fork of TabType. Upstream copyright and third-party acknowledgments are preserved.")
+                Text("KeyWeaver is an MIT-licensed fork of TabType. Upstream copyright and third-party acknowledgments are preserved.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Section("Third-party acknowledgments") {
@@ -448,19 +451,19 @@ struct AboutPane: View {
     }
 
     private static let acknowledgments: [(name: String, detail: String)] = [
-        ("Apple Foundation Models & Vision", "On-device AI completions and OCR — Apple Inc."),
-        ("MLX Swift", "Local model inference on Apple silicon — Apple / ml-explore"),
-        ("mlx-swift-lm", "LLM model implementations — ml-explore"),
-        ("swift-transformers", "Hugging Face model download — Hugging Face"),
-        ("Qwen2.5", "Local base models — Alibaba (Apache-2.0)"),
+        ("llama.cpp & ggml", "Local inference runtime — The ggml authors (MIT)."),
+        ("xxHash", "Runtime hashing — Yann Collet (BSD-2-Clause)."),
+        ("Apple AppKit & Vision", "Native interface and on-device OCR frameworks — Apple Inc."),
+        ("Bundled fonts", "SIL Open Font License; individual notices are included with the fonts."),
         ("gemoji", "Emoji shortcode dataset — GitHub (MIT)"),
-        ("FrequencyWords", "Autocorrect frequency lists — Hermit Dave (MIT)"),
+        ("FrequencyWords", "Word-frequency content — Hermit Dave (CC BY-SA 4.0); code is MIT."),
+        ("English frequency data", "SymSpell, Google Books Ngram and SCOWL; data attribution and notices are included."),
         ("SymSpell algorithm", "Symmetric-delete spelling correction — Wolf Garbe (MIT)"),
     ]
 }
 
 
-/// How much writing Keyweave has learned from, with an erase button.
+/// How much writing KeyWeaver has learned from, with an erase button.
 private struct LearnedWritingRow: View {
     @ObservedObject private var store = WritingStore.shared
     @State private var confirming = false
@@ -475,7 +478,7 @@ private struct LearnedWritingRow: View {
             Button("Erase…", role: .destructive) { confirming = true }
                 .disabled(store.documentCount == 0)
         }
-        .confirmationDialog("Erase everything Keyweave learned from your writing?", isPresented: $confirming) {
+        .confirmationDialog("Erase everything KeyWeaver learned from your writing?", isPresented: $confirming) {
             Button("Erase", role: .destructive) { store.eraseAll() }
         }
     }

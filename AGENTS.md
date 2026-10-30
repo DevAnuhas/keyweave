@@ -1,13 +1,13 @@
-# Working in Keyweave
+# Working in KeyWeaver
 
-Keyweave is a working-name fork of TabType. Preserve the upstream MIT notice and history. Product direction and current status live in [CONTEXT.md](CONTEXT.md); the active outcome is [docs/MILESTONE.md](docs/MILESTONE.md).
+KeyWeaver is a public fork of TabType with isolated Keyweave storage namespaces. Preserve the upstream MIT notice and history. Product direction and current status live in [CONTEXT.md](CONTEXT.md); the active outcome is [docs/MILESTONE.md](docs/MILESTONE.md).
 
 ## Invariants
 
 - Keep inference on the Mac. Do not add telemetry or cloud inference as a shortcut to quality. Screen, clipboard, writing-history and cross-Mac context require explicit, reversible controls.
 - Preserve secure-field exclusion and app/domain controls. Test focus changes, stale selections, cancellation and insertion readback before expanding app support. A setting without working behavior is not a feature.
 - Do not claim Cotypist parity from a README, changelog, source search or a successful build. Distinguish published claims, static implementation, reproduced behavior and measured results.
-- Before running a fork build, complete the identity/update/storage isolation in [docs/FORK-IDENTITY.md](docs/FORK-IDENTITY.md). The inherited app still identifies itself as TabType.
+- Before running a fork build, complete the identity/update/storage isolation in [docs/FORK-IDENTITY.md](docs/FORK-IDENTITY.md). The app uses dev.anuhas.keyweave; preserve its isolated namespaces.
 - Proprietary app bundles, decompiler output, extracted prompts/assets, writing histories, credentials, signing keys and raw screen/clipboard captures stay outside this public repository. Use synthetic content for tests and public evidence.
 - Study lawful, authorized behavior and implement independently. Do not modify Cotypist, remove licensing/tier restrictions, use its signing identity, or distribute its code, prompts, assets or model artifacts. Pause any probe whose authorization or terms are unclear; continue public-document and ordinary behavior research where appropriate.
 - Keep changes focused and upstream-friendly. Do not rename all Swift modules or replace working subsystems merely to rebrand the app.

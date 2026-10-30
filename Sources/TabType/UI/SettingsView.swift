@@ -128,12 +128,12 @@ struct GeneralSettingsView: View {
                     .disabled(!AppSafetyPolicy.inputMonitoringEnabled)
                 Text("Input monitoring is off in this build.")
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle("Launch Keyweave at login", isOn: $launchAtLogin)
+                Toggle("Launch KeyWeaver at login", isOn: $launchAtLogin)
                     .disabled(!AppSafetyPolicy.launchAtLoginEnabled)
                     .onChange(of: launchAtLogin) { _, on in LaunchAtLogin.set(on) }
                 Toggle("Show menu bar icon", isOn: $settings.showMenuBarIcon)
                 Toggle("Show floating accessory button", isOn: $settings.showAccessoryButton)
-                Text("macOS text suggestions are managed in System Settings. Keyweave does not change that preference.")
+                Text("macOS text suggestions are managed in System Settings. KeyWeaver does not change that preference.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -255,7 +255,7 @@ struct AppsSettingsView: View {
                 } else {
                     ContentUnavailableView("Select an app",
                         systemImage: "app.badge",
-                        description: Text("Choose an app to customize Keyweave for it."))
+                        description: Text("Choose an app to customize KeyWeaver for it."))
                 }
             }
             .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
@@ -359,7 +359,7 @@ private struct AppOverrideDetail: View {
                     ProfileBadge(profile: resolved.profile)
                 }
             }
-            Section("How Keyweave works here") {
+            Section("How KeyWeaver works here") {
                 VStack(alignment: .leading, spacing: 5) {
                     ForEach(resolved.summaryLines, id: \.self) { line in
                         HStack(alignment: .top, spacing: 6) {
@@ -421,19 +421,19 @@ private struct AppOverrideDetail: View {
                         Text(String(format: "%+.1f pt", override.ghostVerticalOffset ?? 0)).monospacedDigit()
                     }
                 }
-                Text("Fine-tune the suggestion text if it doesn't line up with this app's text. Keyweave normally measures the app's font automatically.")
+                Text("Fine-tune the suggestion text if it doesn't line up with this app's text. KeyWeaver normally measures the app's font automatically.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Troubleshooting") {
                 Toggle("Preview suggestions in a mirror", isOn: Binding(
                     get: { override.textMirror ?? false },
                     set: { override.textMirror = $0 ? true : nil }))
-                Text("If suggestions can't be shown in line with the cursor in this app, Keyweave previews them in a small floating mirror of the line you're typing.")
+                Text("If suggestions can't be shown in line with the cursor in this app, KeyWeaver previews them in a small floating mirror of the line you're typing.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Suggest in small fields too", isOn: Binding(
                     get: { override.ignoreSizeThresholds ?? false },
                     set: { override.ignoreSizeThresholds = $0 ? true : nil }))
-                Text("Normally Keyweave skips small fields like search boxes.")
+                Text("Normally KeyWeaver skips small fields like search boxes.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Improve compatibility with this app", isOn: $override.improveCompatibility)
                 Text("If completions don't appear reliably in this app, try turning this on — it switches to clipboard-paste insertion.")
@@ -490,7 +490,7 @@ private struct DomainsPane: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             Section("Built-in chat websites") {
-                Text("On these sites, Keyweave reads the visible conversation via the accessibility tree (like a chat app) so suggestions follow the discussion. Add a rule below to disable a site instead.")
+                Text("On these sites, KeyWeaver reads the visible conversation via the accessibility tree (like a chat app) so suggestions follow the discussion. Add a rule below to disable a site instead.")
                     .font(.caption).foregroundStyle(.secondary)
                 ForEach(Array(AppPolicyStore.chatDomains).sorted(), id: \.self) { domain in
                     HStack {
@@ -610,7 +610,7 @@ struct AdvancedSettingsView: View {
                 }
             }
             Section {
-                Label("Keyweave runs 100% locally. Your text never leaves this Mac.",
+                Label("KeyWeaver runs 100% locally. Your text never leaves this Mac.",
                       systemImage: "lock.shield")
                     .font(.callout).foregroundStyle(.secondary)
             }
