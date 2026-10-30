@@ -400,7 +400,7 @@ struct UpdatesSection: View {
     var body: some View {
         Section("Updates") {
             LabeledContent("Version", value: updater.currentVersion)
-            Text("Automatic updates are disabled in this preview. Download new versions from the KeyWeaver GitHub releases page.")
+            Text("Download updates from the KeyWeaver GitHub releases page. Automatic installation is disabled.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -419,7 +419,7 @@ struct AboutPane: View {
                         }
                         VStack(alignment: .leading) {
                             Text("KeyWeaver").font(.title2).bold()
-                            Text("An early preview of open-source, on-device autocomplete for macOS.")
+                            Text("Open-source, on-device autocomplete for macOS.")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                     }

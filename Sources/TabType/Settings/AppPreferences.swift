@@ -2,10 +2,10 @@ import CryptoKit
 import Foundation
 import TabTypeKit
 
-/// Build-time capabilities for Gate0. Persisted preferences and app overrides
-/// cannot enable these services in this build.
+/// Core autocomplete is available. The retained optional acquisition/sync
+/// services stay closed until their consent and compatibility work is complete.
 enum AppSafetyPolicy {
-    static let inputMonitoringEnabled = false
+    static let inputMonitoringEnabled = true
     static let syncEnabled = false
     static let writingEnabled = false
     static let screenContextEnabled = false

@@ -1,5 +1,7 @@
 # KeyWeaver 0.1.0 preview
 
+> **Withdrawn:** the `v0.1.0-preview.1` GitHub release and remote tag were removed on 2026-10-30. This report preserves the original build's evidence; it does not describe current behavior. Continue with [KeyWeaver 2.2.0](keyweaver-2.2.0.md), which restores core startup and continues the inherited version line. The hashes and notarization IDs below apply only to the withdrawn artifacts.
+
 Release tag: `v0.1.0-preview.1`. App version/build: `0.1.0` / `12`. This is an Apple Silicon interface/isolation preview: suggestions and input monitoring are disabled. Context, clipboard context, writing memory, sync, login registration and automatic updates remain off. Signing/notarization does not establish feature parity or daily-use readiness.
 
 ## Artwork and packaging

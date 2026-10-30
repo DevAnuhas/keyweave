@@ -2,9 +2,8 @@ import Combine
 import Foundation
 import TabTypeKit
 
-/// The bundled catalog and model files in Keyweave's namespace. Gate0 startup
-/// and Settings getters are passive; explicit user model-management actions
-/// retain their existing implementation.
+/// The bundled catalog and model files in Keyweave's namespace. Construction
+/// and Settings getters are passive; startup loads only an installed selection.
 @MainActor
 final class LlamaModelManager: ObservableObject {
     static let shared = LlamaModelManager()
@@ -25,7 +24,8 @@ final class LlamaModelManager: ObservableObject {
         didSet { defaults.set(selectedID, forKey: Self.selectedKey) }
     }
     private let defaults: UserDefaults
-    let inference = InferenceEngine()
+    let inference: InferenceEngine
+    private let loadModel: @Sendable (String) async throws -> Void
     let store: TabTypeKit.ModelStore
     let ramGB: Int
 
@@ -34,16 +34,21 @@ final class LlamaModelManager: ObservableObject {
     private(set) var decoderOptions: DecoderOptions?
     private(set) var loadedID: String?
     private var downloadTask: Task<Void, Never>?
+    private var didStart = false
 
     private static let selectedKey = "llamaModelID"
     private static let customPrefix = "custom:"
 
     init(defaults: UserDefaults = AppPreferences.current,
          store: TabTypeKit.ModelStore = TabTypeKit.ModelStore(),
-         ramGB: Int = Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824)) {
+         ramGB: Int = Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824),
+         loadModel: (@Sendable (String) async throws -> Void)? = nil) {
         self.defaults = defaults
         self.store = store
         self.ramGB = ramGB
+        let inference = InferenceEngine()
+        self.inference = inference
+        self.loadModel = loadModel ?? { path in try await inference.load(modelPath: path) }
         let bundled = (try? TabTypeKit.ModelCatalog.bundled())
             ?? TabTypeKit.ModelCatalog(version: 0, models: [], recommendations: [])
         catalog = bundled
@@ -79,9 +84,23 @@ final class LlamaModelManager: ObservableObject {
 
     // MARK: Lifecycle
 
-    /// Gate0 startup is passive: no directory creation, catalog refresh, power
-    /// subscription, automatic model load or interrupted-download resume.
-    func start() {}
+    /// Restore the selected local model once. Missing/partial downloads wait for
+    /// an explicit Download action; startup never creates storage or uses a
+    /// remote catalog, resumes a transfer, or runs model diagnostics.
+    func start() {
+        guard !didStart else { return }
+        didStart = true
+        guard case .noModel = status else { return }
+        guard let entry = entry(id: selectedID) else {
+            if !selectedID.isEmpty, !selectedID.hasPrefix(Self.customPrefix) {
+                status = .failed(id: selectedID,
+                                 message: "Selected model is unavailable. Choose a model in Settings.")
+            }
+            return
+        }
+        guard store.isInstalled(entry) else { return }
+        load(selectedID)
+    }
 
     /// Choose a model: load it if present, otherwise download then load.
     func select(_ id: String) {
@@ -144,7 +163,7 @@ final class LlamaModelManager: ObservableObject {
         Task {
             let start = Date()
             do {
-                try await inference.load(modelPath: path)
+                try await loadModel(path)
                 template = entry.modelTemplate
                 decoderOptions = entry.decoderOptions()
                 loadedID = id

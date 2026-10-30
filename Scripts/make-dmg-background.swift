@@ -42,10 +42,6 @@ for scale in [1, 2] {
     arrow.lineJoinStyle = .round
     NSColor(srgbRed: 0.54, green: 0.57, blue: 0.63, alpha: 1).setStroke()
     arrow.stroke()
-    let muted = NSColor(srgbRed: 0.40, green: 0.43, blue: 0.48, alpha: 1)
-    text("Updating? Quit KeyWeaver before replacing it.", x: 36, top: 292, size: 12, color: muted)
-    text("Then open it from Applications and eject this disk.", x: 36, top: 314, size: 12, color: muted)
-    text("Preview — suggestions are disabled.", x: 36, top: 364, size: 11, color: muted)
     NSGraphicsContext.restoreGraphicsState()
     let output = directory.appendingPathComponent(scale == 1 ? "background.png" : "background@2x.png")
     let data = NSMutableData()

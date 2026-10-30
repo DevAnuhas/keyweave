@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 import TabTypeKit
@@ -78,7 +79,7 @@ final class StartupIsolationTests: XCTestCase {
     }
 
     @MainActor
-    func testModelConstructionGettersAndRepeatedStartNeverCreateLoadOrResume() async throws {
+    func testModelConstructionAndGettersNeverCreateLoadOrResume() async throws {
         let bundled = try ModelCatalog.bundled()
         let entry = try XCTUnwrap(bundled.models.first)
         for fixture in ["absent", "partial", "installed"] {
@@ -109,9 +110,6 @@ final class StartupIsolationTests: XCTestCase {
             _ = models.fit(entry)
             XCTAssertEqual(models.isInstalled(selected), fixture == "installed", fixture)
             XCTAssertFalse(models.isInstalled("custom:missing.gguf"))
-            models.start()
-            models.start()
-
             XCTAssertEqual(models.status, .noModel, fixture)
             XCTAssertNil(models.loadedID, fixture)
             let inferenceState = await models.inference.state
@@ -122,22 +120,45 @@ final class StartupIsolationTests: XCTestCase {
     }
 
     @MainActor
-    func testAutomaticStartupCannotStartInputMonitoringEvenWithExistingTrust() {
-        for trusted in [false, true] {
+    func testStartupStartsInputOnlyAfterAccessibilityIsTrusted() {
+        for (trusted, canStart, expected) in [
+            (false, true, AppSettings.InputMonitoringState.needsAccessibility),
+            (true, false, .failed),
+            (true, true, .active)
+        ] {
             let recorder = PlatformOperationRecorder()
-            AppDelegate.startEngineIfTrusted(operations: .init(
+            let state = AppDelegate.startEngineIfTrusted(operations: .init(
                 accessibilityTrusted: { recorder.record("trust"); return trusted },
-                startEngine: { recorder.record("engine") }))
-            XCTAssertTrue(recorder.operations.isEmpty)
+                startEngine: { recorder.record("engine"); return canStart }))
+            XCTAssertEqual(state, expected)
+            XCTAssertEqual(recorder.operations, trusted ? ["trust", "engine"] : ["trust"])
         }
     }
 
     @MainActor
-    func testDirectEngineStartCannotEnableInputMonitoring() throws {
+    func testOpeningAppAgainShowsAndReusesSettings() throws {
+        guard ProcessInfo.processInfo.environment["KEYWEAVE_TEST_HOME"] != nil else {
+            throw XCTSkip("Run Scripts/test.sh for an isolated preferences and storage root")
+        }
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        let result = (delegate as NSApplicationDelegate).applicationShouldHandleReopen?(app, hasVisibleWindows: false)
+        XCTAssertEqual(result, false)
+        let window = try XCTUnwrap(delegate.settingsWindow, "Opening the installed menu-bar app must show Settings")
+        XCTAssertTrue(window.isVisible)
+        window.close()
+        _ = (delegate as NSApplicationDelegate).applicationShouldHandleReopen?(app, hasVisibleWindows: false)
+        XCTAssertTrue(delegate.settingsWindow === window)
+        XCTAssertTrue(window.isVisible)
+        window.close()
+    }
+
+    @MainActor
+    func testDirectEngineStartRequiresAccessibilityBeforePlatformMonitoring() throws {
         let suite = "dev.anuhas.keyweave.tests.input.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let engine = Engine(settings: AppSettings(defaults: defaults))
+        let engine = Engine(settings: AppSettings(defaults: defaults), accessibilityTrusted: { false })
         XCTAssertFalse(engine.start())
     }
 

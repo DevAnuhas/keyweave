@@ -13,7 +13,7 @@ struct SetupPane: View {
     private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var modelReady: Bool { models.isLoaded }
-    private var allSet: Bool { AppSafetyPolicy.inputMonitoringEnabled && trusted && modelReady }
+    private var allSet: Bool { trusted && modelReady && settings.isEnabled && settings.inputMonitoringState == .active }
 
     var body: some View {
         Form {
@@ -23,10 +23,8 @@ struct SetupPane: View {
                         .font(.title2)
                         .foregroundStyle(allSet ? .green : .secondary)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(AppSafetyPolicy.inputMonitoringEnabled ? (allSet ? "All set!" : "Finish setup") : "KeyWeaver Preview").font(.headline)
-                        Text(AppSafetyPolicy.inputMonitoringEnabled
-                             ? (allSet ? "KeyWeaver is ready to use. Start typing in any app and press Tab to accept a suggestion." : "Complete the steps below to start getting suggestions.")
-                             : "Suggestions and input monitoring are disabled in this preview. You can inspect Settings without granting permissions or downloading a model.")
+                        Text(allSet ? "All set!" : "Finish setup").font(.headline)
+                        Text(allSet ? "KeyWeaver is ready to use. Start typing in a supported text field and press Tab to accept a suggestion." : "Complete the steps below to start getting suggestions.")
                             .font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -38,9 +36,17 @@ struct SetupPane: View {
             Section {
                 statusRow(
                     ok: !AppSafetyPolicy.inputMonitoringEnabled || trusted, title: "Accessibility permission",
-                    detail: AppSafetyPolicy.inputMonitoringEnabled ? "Required — lets KeyWeaver read the field you're typing in and insert completions." : "Not needed while suggestions are disabled in this preview.",
+                    detail: AppSafetyPolicy.inputMonitoringEnabled ? "Required — lets KeyWeaver read the field you're typing in and insert completions." : "Required to start suggestions.",
                     action: (!AppSafetyPolicy.inputMonitoringEnabled || trusted ? nil : ("Grant", { _ = AccessibilityBridge.requestTrust() })),
                     doneLabel: AppSafetyPolicy.inputMonitoringEnabled ? "Granted" : "Not needed")
+
+                statusRow(
+                    ok: settings.inputMonitoringState == .active, title: "Keyboard monitoring",
+                    detail: settings.inputMonitoringState == .failed
+                        ? "Could not start. Check System Settings → Privacy & Security → Input Monitoring. KeyWeaver retries automatically."
+                        : "Starts after Accessibility is granted. Suggestions can be paused from the menu bar.",
+                    action: nil,
+                    doneLabel: settings.inputMonitoringState == .active ? "Running" : "Not running")
 
                 statusRow(
                     ok: screenOK, title: "Screen Recording permission",

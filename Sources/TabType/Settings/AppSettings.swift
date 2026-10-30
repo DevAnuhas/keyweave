@@ -5,6 +5,13 @@ import Combine
 /// Observable so SwiftUI views and the engine react to changes live.
 @MainActor
 final class AppSettings: ObservableObject {
+    enum InputMonitoringState: Equatable {
+        case needsAccessibility, active, failed
+    }
+
+    /// Runtime state only; never persisted or restored from another session.
+    @Published var inputMonitoringState: InputMonitoringState = .needsAccessibility
+
     enum ScreenCropMode: String, CaseIterable, Codable {
         case fullWindow = "Full Window"
         case columnar = "Columnar Sorting"
