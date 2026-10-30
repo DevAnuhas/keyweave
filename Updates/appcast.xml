@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-  <channel>
-    <title>KeyWeave Updates</title>
-    <link>https://github.com/DevAnuhas/keyweave</link>
-    <description>Signed KeyWeave updates</description>
-    <language>en</language>
-  </channel>
-</rss><!-- sparkle-signatures:
-edSignature: NIbD9oPKrL4MH0MYwmPpL7L3I6nmATWOXwlOlkL6IZQEqDtsb0+XxCkjXOGeqKNFvOf83LGk1LtSL7QxWZpSDg==
-length: 584
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0"><channel><title>KeyWeave Updates</title><link>https://github.com/DevAnuhas/keyweave</link><description>Signed KeyWeave updates</description><item><title>KeyWeave 2.4.0</title><link>https://github.com/DevAnuhas/keyweave/releases/tag/v2.4.0</link><pubDate>Fri, 30 Oct 2026 18:41:23 GMT</pubDate><description>- Add Check for Updates in the menu bar and About settings.
+- Check daily and show an in-app update prompt. Turn scheduled checks off in About; installation always requires your action.
+- Verify signed feeds and update archives before extraction, then install and relaunch with Sparkle.
+
+Versions through 2.3.0 need one final manual upgrade to get the updater. Existing models, preferences and opt-in services stay in their KeyWeave namespaces.
+</description><sparkle:version>17</sparkle:version><sparkle:shortVersionString>2.4.0</sparkle:shortVersionString><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements><enclosure url="https://github.com/DevAnuhas/keyweave/releases/download/v2.4.0/KeyWeave-2.4.0-arm64.dmg" length="21715904" type="application/octet-stream" sparkle:edSignature="lvO+tzMZxVgq9vv1kQLiZWbHmnwD2E9DCmbd6lF4NZ2kzP5yEJZRFaE0SZ4MQEwr+TVIHEmrzmYL5GpS4Y67Dw=="></enclosure></item></channel></rss><!-- sparkle-signatures:
+edSignature: x/4dUTKxeMxioH9HG/5JEfoMYNOCeJob3gb49tJalQXtq8lC5pMzXsXILJXRulg73aEG7rv1olTYlYyFl/NzBw==
+length: 1674
 -->
