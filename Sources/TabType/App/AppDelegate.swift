@@ -15,18 +15,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private(set) var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
+    private var accessibilityTimer: Timer?
 
-    /// The startup platform boundary. It checks existing trust; it has no
-    /// operation for requesting permissions or starting forbidden services.
+    /// Permission requests are explicit UI actions. Startup only checks trust.
     struct StartupOperations {
         var accessibilityTrusted: () -> Bool
-        var startEngine: () -> Void
+        var startEngine: () -> Bool
     }
 
-    static func startEngineIfTrusted(operations: StartupOperations) {
-        guard AppSafetyPolicy.inputMonitoringEnabled else { return }
-        guard operations.accessibilityTrusted() else { return }
-        operations.startEngine()
+    static func startEngineIfTrusted(operations: StartupOperations) -> AppSettings.InputMonitoringState {
+        guard AppSafetyPolicy.inputMonitoringEnabled,
+              operations.accessibilityTrusted() else { return .needsAccessibility }
+        return operations.startEngine() ? .active : .failed
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -47,6 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             .receive(on: RunLoop.main)
             .sink { [weak self] show in self?.statusItem.isVisible = show }
             .store(in: &cancellables)
+        settings.$inputMonitoringState
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.rebuildMenu() }
+            .store(in: &cancellables)
 
         // Accessory button → open Settings.
         NotificationCenter.default.addObserver(
@@ -59,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Register bundled fonts so ghost text can match fields that use them.
         Log.shared.info("ghost fonts: \(BundledFonts.families.joined(separator: ", "))")
 
-        // Gate0 observes status without starting, loading or prewarming a model.
+        // Only an already installed KeyWeaver model loads at startup.
         llamaModels.$status
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.rebuildMenu() }
@@ -67,16 +72,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Autocorrect and the typo gate on suggestions both use it.
         SpellChecker.shared.loadIfNeeded(language: settings.autocorrectLanguage)
 
-        // Gate0 also blocks input monitoring when existing trust is reported.
-        // A terminal-launched process may inherit a responsible app's trust.
-        Self.startEngineIfTrusted(operations: .init(
-            accessibilityTrusted: { AccessibilityBridge.isTrusted() },
-            startEngine: { _ = self.engine.start() }))
+        llamaModels.start()
+        refreshInputMonitoring()
+        // A new bundle needs its own grant. Detect grants/revocations without
+        // asking for permission repeatedly or requiring an app restart.
+        accessibilityTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshInputMonitoring() }
+        }
+        // Finder launches must visibly open the app, even with a hidden icon or
+        // an unfinished model/permission setup.
+        SettingsNavigator.shared.pendingSection = .setup
+        openSettings()
+    }
+
+    private func refreshInputMonitoring() {
+        let trusted = AccessibilityBridge.isTrusted()
+        if !trusted {
+            if engine.isRunning { engine.stop() }
+            if settings.inputMonitoringState != .needsAccessibility {
+                settings.inputMonitoringState = .needsAccessibility
+            }
+            return
+        }
+        guard !engine.isRunning else { return }
+        let state = Self.startEngineIfTrusted(operations: .init(
+            accessibilityTrusted: { trusted },
+            startEngine: { self.engine.start() }))
+        if state != settings.inputMonitoringState {
+            settings.inputMonitoringState = state
+            Log.shared.info("Input monitoring: \(state)")
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openSettings()
+        return false
     }
 
     /// The model must be freed before exit: ggml aborts if Metal resources are
     /// still alive when the process tears down.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        accessibilityTimer?.invalidate()
+        accessibilityTimer = nil
+        engine.stop()
         Task { @MainActor in
             await llamaModels.shutdown()
             NSApp.reply(toApplicationShouldTerminate: true)
@@ -224,7 +262,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func statusLine() -> String {
-        guard AppSafetyPolicy.inputMonitoringEnabled else { return "\(ProductIdentity.name) Preview — suggestions are off" }
+        switch settings.inputMonitoringState {
+        case .needsAccessibility: return "Finish setup — grant Accessibility in Settings"
+        case .failed: return "Keyboard monitoring failed — check Privacy & Security"
+        case .active: break
+        }
         let name = { (id: String) in self.llamaModels.entry(id: id)?.name ?? id }
         switch llamaModels.status {
         case .noModel: return "No model yet — choose one in Settings ▸ Model"

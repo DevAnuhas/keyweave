@@ -14,6 +14,10 @@ final class LlamaIntegrationTests: XCTestCase {
     }
 
     private static var modelPaths: [String] {
+        // Explicit opt-in permits a verified fixture outside this public repo.
+        if let path = ProcessInfo.processInfo.environment["KEYWEAVE_TEST_MODEL"], path.hasPrefix("/") {
+            return [path]
+        }
         let repo = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let dir = repo.appendingPathComponent("models")

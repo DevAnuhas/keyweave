@@ -9,6 +9,7 @@ import Combine
 @MainActor
 final class Engine {
     private let settings: AppSettings
+    private let accessibilityTrusted: @MainActor () -> Bool
     private let router: EngineRouter
     private let monitor = KeystrokeMonitor()
     private let overlay = SuggestionOverlay()
@@ -228,8 +229,10 @@ final class Engine {
 
     private(set) var isRunning = false
 
-    init(settings: AppSettings = .shared) {
+    init(settings: AppSettings = .shared,
+         accessibilityTrusted: @escaping @MainActor () -> Bool = { AccessibilityBridge.isTrusted() }) {
         self.settings = settings
+        self.accessibilityTrusted = accessibilityTrusted
         self.router = EngineRouter()
         self.inlineCommand = InlineCommandController(settings: settings)
     }
@@ -238,7 +241,7 @@ final class Engine {
     /// (usually missing Accessibility permission).
     @discardableResult
     func start() -> Bool {
-        guard AppSafetyPolicy.inputMonitoringEnabled else { return false }
+        guard AppSafetyPolicy.inputMonitoringEnabled, accessibilityTrusted() else { return false }
         guard !isRunning else { return true }
         // A hung app must not stall typing: cap every AX call (Cotypist does too).
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.25)
