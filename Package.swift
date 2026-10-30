@@ -11,6 +11,12 @@ let package = Package(
         .executable(name: "tabtype-eval", targets: ["TabTypeEval"]),
     ],
     targets: [
+        // Official Sparkle release, pinned together with its archive checksum.
+        .binaryTarget(
+            name: "Sparkle",
+            url: "https://github.com/sparkle-project/Sparkle/releases/download/2.10.1/Sparkle-for-Swift-Package-Manager.zip",
+            checksum: "4c2e48a3e50ebcc2c88a58a4c7264a1a99c3c31857ce754357afb9cdb323022a"
+        ),
         // llama.cpp (Metal) — the v2 inference engine. Pinned release XCFramework;
         // bump the tag and checksum together (`swift package compute-checksum`).
         .binaryTarget(
@@ -35,7 +41,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "TabType",
-            dependencies: ["TabTypeKit"],
+            dependencies: ["TabTypeKit", "Sparkle"],
             path: "Sources/TabType",
             resources: [
                 .process("Resources/Assets.xcassets"),

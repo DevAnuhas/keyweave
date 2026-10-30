@@ -113,6 +113,10 @@ final class ProductIdentityTests: XCTestCase {
         done
         products="$derived/Build/Products/$config"
         mkdir -p "$products/llama.framework" "$products/TabType_TabType.bundle"
+        sparkle="$products/Sparkle.framework/Versions/B"
+        mkdir -p "$sparkle/XPCServices/Downloader.xpc" "$sparkle/XPCServices/Installer.xpc" "$sparkle/Updater.app"
+        printf 'synthetic helper' > "$sparkle/Autoupdate"
+        ln -s B "$products/Sparkle.framework/Versions/Current"
         printf 'synthetic executable' > "$products/TabType"
         printf 'synthetic resource' > "$products/TabType_TabType.bundle/resource"
         """, at: fixture.appendingPathComponent("bin/xcrun"))

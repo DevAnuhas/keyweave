@@ -1,12 +1,12 @@
 # Fork identity and first-run safety
 
-The source still builds as TabType. **Do not launch a fork build against real user data until this slice is implemented and checked.** Changing the GitHub repository name does not change the application's identity.
+The app is KeyWeave (`dev.anuhas.keyweave`); internal Swift modules retain TabType names. Keep the isolated identity and storage boundaries below when changing startup or distribution.
 
 ## Existing coupling to inspect
 
 - `Resources/Info.plist`: display/executable/bundle identifiers.
 - `Scripts/build.sh`, `Scripts/setup-signing.sh`, `Scripts/release.sh`: output names, signing certificate label, identifier and release packaging.
-- `Sources/TabType/App/Updater.swift`: hard-coded `nilava/TabType` release API and publisher verification.
+- `Sources/TabType/App/Updater.swift`: only the pinned KeyWeave feed and public key may activate Sparkle. Test processes remain inert.
 - `Sources/TabTypeKit/Catalog/ModelCatalog.swift`: the moving upstream catalog endpoint.
 - `Sources/TabTypeKit/Catalog/ModelStore.swift`, `Sources/TabType/Core/WritingStore.swift`, settings/statistics/logging: Application Support and preference namespaces.
 - `Sources/TabType/App/SyncManager.swift`: `app.tabtype.sync` Keychain service and `TabType Sync` iCloud Drive folder.
@@ -33,4 +33,4 @@ For local development, use a distinct stable development signing identity rather
 - Fork updater tests for no release, wrong application/publisher, bad checksum and failed replacement.
 - Relaunch/rebuild permissions behavior recorded; no promise that the old app's grants transfer to a new bundle identity.
 
-This document defines an implementation target. The bootstrap does not implement these changes.
+The production app uses these isolated namespaces. In-app updates require a signed KeyWeave feed, EdDSA archive verification before extraction, and Developer ID verification; the [release runbook](runbooks/releasing.md) owns publishing instructions.

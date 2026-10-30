@@ -39,16 +39,19 @@ final class StartupIsolationTests: XCTestCase {
         configuration.protocolClasses = [StartupNetworkProbe.self]
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
-        let updater = Updater(defaults: defaults, session: session)
+        let updater = Updater(allowed: false, makeDriver: {
+            XCTFail("An unavailable updater must not construct its service")
+            return SparkleUpdateDriver()
+        })
 
         updater.automatic = true
-        updater.checkIfDue()
-        updater.install(.init(version: "99", page: URL(string: "https://update.invalid/release")!,
-                              dmg: URL(string: "https://update.invalid/app.dmg")!, sha256: nil))
-        await updater.check()
+        updater.start()
+        updater.start()
+        updater.checkForUpdates()
 
-        XCTAssertFalse(updater.automatic, "Persisted or direct enablement cannot enable updates in Gate0")
-        XCTAssertEqual(updater.state, .idle)
+        XCTAssertFalse(updater.automatic)
+        XCTAssertFalse(updater.canCheckForUpdates)
+        XCTAssertFalse(updater.isRunning)
         XCTAssertEqual(StartupNetworkProbe.requestCount, 0)
         XCTAssertEqual(defaults.persistentDomain(forName: suite)! as NSDictionary, before)
     }

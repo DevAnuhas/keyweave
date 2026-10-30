@@ -37,6 +37,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         setupStatusItem()
         startSecureInputWatch()
 
+        Updater.shared.$canCheckForUpdates
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.rebuildMenu() }
+            .store(in: &cancellables)
+        Updater.shared.start()
+
         // Rebuild the menu whenever model state or enablement changes.
         settings.$isEnabled
             .receive(on: RunLoop.main)
@@ -169,6 +175,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // MARK: - Status bar
 
+    @objc private func checkForUpdates() { Updater.shared.checkForUpdates() }
+
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -244,6 +252,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         menu.addItem(.separator())
         menu.addItem(item("Open Log", icon: "doc.text.magnifyingglass", action: #selector(openLog)))
         menu.addItem(item("About \(ProductIdentity.name)", icon: "info.circle", action: #selector(openAbout)))
+        menu.addItem(item("Check for Updates…", icon: "arrow.triangle.2.circlepath",
+                          action: #selector(checkForUpdates), enabled: Updater.shared.canCheckForUpdates))
 
         menu.addItem(.separator())
         menu.addItem(item("Quit \(ProductIdentity.name)", icon: "power", action: #selector(quit), key: "q"))

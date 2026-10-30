@@ -7,7 +7,8 @@ if [ "${1:-}" = --help ]; then
     cat <<'USAGE'
 Usage: SIGN_IDENTITY=... DEVELOPMENT_TEAM=... KEYCHAIN_PROFILE=... Scripts/release.sh
 Build/sign the arm64 app, notarize/staple it, create ZIP/DMG, notarize/staple the
-DMG, and calculate final checksums. Receipts stay outside git. A timeout stops
+DMG, calculate final checksums and generate the signed update feed. The KeyWeave
+Sparkle signing key must already exist in the login Keychain. Receipts stay outside git. A timeout stops
 the pipeline; use the printed notarize.sh --resume command, then package.sh.
 This does not install, launch, tag, push or publish anything to GitHub.
 USAGE
@@ -23,3 +24,6 @@ RELEASE=1 CONFIG=Release "$ROOT/Scripts/build.sh" app
 version="$(plutil -extract CFBundleShortVersionString raw -o - "$ROOT/dist/KeyWeave.app/Contents/Info.plist")"
 "$ROOT/Scripts/notarize.sh" dmg "$ROOT/dist/KeyWeave-$version-arm64.dmg"
 "$ROOT/Scripts/package.sh" --verify
+appcast_arguments=(--app "$ROOT/dist/KeyWeave.app" --archive "$ROOT/dist/KeyWeave-$version-arm64.dmg")
+if [ -n "${RELEASE_NOTES_FILE:-}" ]; then appcast_arguments+=(--notes "$RELEASE_NOTES_FILE"); fi
+python3 "$ROOT/Scripts/appcast.py" "${appcast_arguments[@]}"

@@ -90,6 +90,14 @@ while [ "$#" -gt 0 ]; do
 done
 products="$derived/Build/Products/Release"
 mkdir -p "$products/llama.framework"
+sparkle="$products/Sparkle.framework/Versions/B"
+mkdir -p "$sparkle/XPCServices/Downloader.xpc/Contents/MacOS" "$sparkle/XPCServices/Installer.xpc/Contents/MacOS" "$sparkle/Updater.app/Contents/MacOS"
+printf 'synthetic framework' > "$sparkle/Sparkle"
+printf 'synthetic helper' > "$sparkle/Autoupdate"
+printf 'synthetic helper' > "$sparkle/Updater.app/Contents/MacOS/Updater"
+printf 'synthetic helper' > "$sparkle/XPCServices/Downloader.xpc/Contents/MacOS/Downloader"
+printf 'synthetic helper' > "$sparkle/XPCServices/Installer.xpc/Contents/MacOS/Installer"
+ln -s B "$products/Sparkle.framework/Versions/Current"
 printf 'synthetic executable' > "$products/TabType"
 printf 'synthetic framework' > "$products/llama.framework/llama"
 ''')
@@ -106,16 +114,23 @@ if sys.argv[1]=="-d":
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
         signs = [arguments for arguments in calls if arguments[0] == "--force"]
-        self.assertEqual(len(signs), 2)
+        self.assertEqual(len(signs), 7)
         self.assertTrue(signs[0][-1].endswith("/Contents/Frameworks/llama.framework"))
-        self.assertTrue(signs[1][-1].endswith("/KeyWeave.app"))
+        self.assertTrue(signs[-1][-1].endswith("/KeyWeave.app"))
+        self.assertTrue(signs[-2][-1].endswith("/Contents/Frameworks/Sparkle.framework"))
+        signed = [arguments[-1] for arguments in signs]
+        for helper in ["Autoupdate", "Updater.app", "XPCServices/Downloader.xpc", "XPCServices/Installer.xpc"]:
+            position = next(i for i, path in enumerate(signed) if path.endswith("/" + helper))
+            self.assertLess(position, 5, "Sign every Sparkle helper before the framework and app")
         for arguments in signs:
             self.assertIn("--timestamp", arguments)
             self.assertIn("--options", arguments)
             self.assertIn("runtime", arguments)
             self.assertNotIn("--deep", arguments)
         self.assertNotIn("--entitlements", signs[0])
-        self.assertIn("--entitlements", signs[1])
+        self.assertIn("--entitlements", signs[-1])
+        for arguments in signs[1:-2]:
+            self.assertIn("--preserve-metadata=entitlements", arguments)
         self.assertTrue((self.root / "dist/KeyWeave.app/Contents/MacOS/KeyWeave").is_file())
 
     def test_notary_without_profile_never_invokes_platform_tools(self):
