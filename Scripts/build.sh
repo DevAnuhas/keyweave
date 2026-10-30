@@ -79,6 +79,12 @@ cp "$PRODUCTS/TabType" "$APP/Contents/MacOS/KeyWeave"
 LLAMA_FW="$(find "$PRODUCTS" -maxdepth 2 -name llama.framework -type d | head -1)"
 [ -n "$LLAMA_FW" ] || fail 'llama.framework is missing; refusing a broken app.'
 cp -R "$LLAMA_FW" "$APP/Contents/Frameworks/"
+SPARKLE_FW="$(find "$PRODUCTS" -maxdepth 2 -name Sparkle.framework -type d | head -1)"
+if [ -z "$SPARKLE_FW" ]; then
+    SPARKLE_FW="$(find "$BUILD_ROOT/source-packages/artifacts" -path '*/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework' -type d | head -1)"
+fi
+[ -n "$SPARKLE_FW" ] || fail 'Sparkle.framework is missing; refusing an app without its updater.'
+cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/"
 if [ "$release" = 1 ]; then
     if ! otool -l "$APP/Contents/MacOS/KeyWeave" | grep -F '@executable_path/../Frameworks' >/dev/null; then
         install_name_tool -add_rpath '@executable_path/../Frameworks' "$APP/Contents/MacOS/KeyWeave"
@@ -100,6 +106,11 @@ if [ "$release" = 1 ]; then
         if [[ "$(file -b "$candidate")" == *Mach-O* ]]; then
             case "$candidate" in
                 "$APP/Contents/MacOS/KeyWeave"|"$APP/Contents/Frameworks/llama.framework/llama"|"$APP/Contents/Frameworks/llama.framework/Versions/"*/llama) ;;
+                "$APP/Contents/Frameworks/Sparkle.framework/Versions/"*/Sparkle|\
+                "$APP/Contents/Frameworks/Sparkle.framework/Versions/"*/Autoupdate|\
+                "$APP/Contents/Frameworks/Sparkle.framework/Versions/"*/Updater.app/Contents/MacOS/Updater|\
+                "$APP/Contents/Frameworks/Sparkle.framework/Versions/"*/XPCServices/Downloader.xpc/Contents/MacOS/Downloader|\
+                "$APP/Contents/Frameworks/Sparkle.framework/Versions/"*/XPCServices/Installer.xpc/Contents/MacOS/Installer) ;;
                 *) fail "Unexpected nested executable: $candidate" ;;
             esac
         fi
@@ -109,6 +120,12 @@ sign_arguments=(--force --sign "$IDENTITY")
 if [ "$release" = 1 ]; then sign_arguments+=(--options runtime --timestamp); fi
 # Sign known code inside-out; app entitlements never propagate to the framework.
 codesign "${sign_arguments[@]}" "$APP/Contents/Frameworks/llama.framework"
+sparkle="$APP/Contents/Frameworks/Sparkle.framework"
+for helper in XPCServices/Downloader.xpc XPCServices/Installer.xpc Autoupdate Updater.app; do
+    [ -e "$sparkle/Versions/Current/$helper" ] || fail "Missing Sparkle helper: $helper"
+    codesign "${sign_arguments[@]}" --preserve-metadata=entitlements "$sparkle/Versions/Current/$helper"
+done
+codesign "${sign_arguments[@]}" "$sparkle"
 codesign "${sign_arguments[@]}" --identifier dev.anuhas.keyweave \
     --entitlements "$ROOT/Resources/TabType.entitlements" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
@@ -117,6 +134,10 @@ if [ "$release" = 1 ]; then
     codesign --verify --strict --test-requirement "$requirement" "$APP"
     framework_requirement="=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"$TEAM\""
     codesign --verify --strict --test-requirement "$framework_requirement" "$APP/Contents/Frameworks/llama.framework"
+    codesign --verify --strict --test-requirement "$framework_requirement" "$sparkle"
+    for helper in XPCServices/Downloader.xpc XPCServices/Installer.xpc Autoupdate Updater.app; do
+        codesign --verify --strict --test-requirement "$framework_requirement" "$sparkle/Versions/Current/$helper"
+    done
     signature="$(codesign -d --verbose=4 "$APP" 2>&1)"
     printf '%s\n' "$signature" | grep -q 'flags=.*runtime' || fail 'Hardened Runtime is missing.'
     printf '%s\n' "$signature" | grep -q '^Timestamp=' || fail 'Secure signing timestamp is missing.'

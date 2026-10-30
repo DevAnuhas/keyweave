@@ -404,15 +404,30 @@ struct StatisticsPane: View {
 /// Experimental, opt-in features that may change or be removed.
 
 
-/// Version + updates (GitHub Releases, verified before installing).
+/// Sparkle checks the signed KeyWeave feed and owns the installation UI.
 struct UpdatesSection: View {
     @ObservedObject private var updater = Updater.shared
 
     var body: some View {
         Section("Updates") {
             LabeledContent("Version", value: updater.currentVersion)
-            Text("Download updates from the KeyWeave GitHub releases page. Automatic installation is disabled.")
+            Toggle("Automatically check for updates", isOn: Binding(
+                get: { updater.automatic }, set: { updater.automatic = $0 }))
+                .disabled(!updater.isRunning)
+            Button("Check for Updates…") { updater.checkForUpdates() }
+                .disabled(!updater.canCheckForUpdates)
+            if let date = updater.lastCheckDate {
+                LabeledContent("Last checked", value: date.formatted(date: .abbreviated, time: .shortened))
+            }
+            Text("Checks daily and shows a prompt when an update is available. Choose Install Update to download, install and relaunch KeyWeave.")
                 .font(.caption).foregroundStyle(.secondary)
+            if let failure = updater.failure {
+                Text("Updates could not start: \(failure)").foregroundStyle(.red)
+                Button("Retry") { updater.start() }
+            } else if !updater.isAvailable {
+                Text("Update checks are available in the signed KeyWeave app.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -463,6 +478,7 @@ struct AboutPane: View {
 
     private static let acknowledgments: [(name: String, detail: String)] = [
         ("llama.cpp & ggml", "Local inference runtime — The ggml authors (MIT)."),
+        ("Sparkle", "Signed in-app updates — Sparkle Project and contributors (MIT and bundled notices)."),
         ("xxHash", "Runtime hashing — Yann Collet (BSD-2-Clause)."),
         ("Apple AppKit & Vision", "Native interface and on-device OCR frameworks — Apple Inc."),
         ("Bundled fonts", "SIL Open Font License; individual notices are included with the fonts."),

@@ -19,7 +19,7 @@ An open-source, on-device macOS writing assistant built from [TabType](https://g
 
 Requires Apple Silicon and macOS 14 or later. Drag `KeyWeave.app` into Applications, open Setup, grant its own Accessibility permission and choose/download a local model. Models are not bundled; TabType/Cotypist data and permissions are not migrated.
 
-Screen/clipboard context, screenshot appearance capture, learning, encrypted iCloud Drive sync and launch at login are available in Settings. Context, learning and sync are off by default and require local opt-in. Screen Recording is required for screenshots; eligible accessible conversation text can work without it. Automatic app updates remain disabled. Complete Cotypist Pro/Labs parity is unfinished.
+Screen/clipboard context, screenshot appearance capture, learning, encrypted iCloud Drive sync and launch at login are available in Settings. Context, learning and sync are off by default and require local opt-in. Screen Recording is required for screenshots; eligible accessible conversation text can work without it. KeyWeave checks its signed update feed daily and offers in-app installation; use About → Check for Updates for a manual check. Versions through 2.3.0 need one manual upgrade to obtain the updater. Complete Cotypist Pro/Labs parity is unfinished.
 
 ## Develop
 

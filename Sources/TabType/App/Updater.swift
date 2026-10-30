@@ -2,45 +2,84 @@ import Combine
 import Foundation
 import TabTypeKit
 
-/// Gate0 has no update feed, transport, installer, process runner, or relaunch
-/// path. Keep the former interface inert so direct callers cannot re-enable it.
+/// Sparkle owns downloading, signature verification, replacement and relaunch.
+/// This facade keeps construction passive and rejects unconfigured/test hosts.
 @MainActor
 final class Updater: ObservableObject {
     static let shared = Updater()
-    static let disabledReason = "Updates are disabled in this Keyweave build."
+    nonisolated static let feedURL = "https://raw.githubusercontent.com/DevAnuhas/keyweave/main/Updates/appcast.xml"
+    nonisolated static let publicKey = "pc1gLnpongI0flX6p0FOVK509djxXgyrKN8rcMB4bRU="
 
-    struct Release: Equatable {
-        var version: String
-        var page: URL
-        var dmg: URL
-        var sha256: String?
-    }
-
-    enum State: Equatable {
-        case idle, checking, upToDate
-        case available(Release)
-        case installing(String)
-        case failed(String)
-    }
-
-    @Published private(set) var state: State = .idle
-
-    var automatic: Bool {
-        get { false }
-        set { /* Gate0 ignores persisted and direct attempts to enable updates. */ }
-    }
+    @Published private(set) var canCheckForUpdates = false
+    @Published private(set) var isRunning = false
+    @Published private(set) var lastCheckDate: Date?
+    @Published private(set) var failure: String?
+    let isAvailable: Bool
+    private let makeDriver: () -> any UpdateDriver
+    private var driver: (any UpdateDriver)?
+    private var observation: AnyCancellable?
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
+    var automatic: Bool {
+        get { driver?.automaticallyChecksForUpdates ?? false }
+        set {
+            guard let driver else { return }
+            driver.automaticallyChecksForUpdates = newValue
+            refresh()
+        }
+    }
 
-    /// Accept isolated dependencies for callers of the former updater API. Gate0
-    /// neither retains nor uses a preferences store or a network session.
-    init(defaults: UserDefaults = AppPreferences.current, session: URLSession? = nil) {}
+    init(allowed: Bool = Updater.isSupportedHost(),
+         makeDriver: @escaping () -> any UpdateDriver = { SparkleUpdateDriver() }) {
+        isAvailable = allowed
+        self.makeDriver = makeDriver
+    }
 
-    func checkIfDue() {}
-    func check() async {}
-    func install(_ release: Release) {}
+    func start() {
+        guard isAvailable, !isRunning else { return }
+        do {
+            let service = makeDriver()
+            try service.start()
+            driver = service
+            isRunning = true
+            failure = nil
+            observation = service.changes.sink { [weak self] in self?.refresh() }
+            refresh()
+        } catch {
+            failure = error.localizedDescription
+        }
+    }
+
+    func checkForUpdates() {
+        guard canCheckForUpdates else { return }
+        driver?.checkForUpdates()
+    }
+
+    private func refresh() {
+        objectWillChange.send()
+        canCheckForUpdates = driver?.canCheckForUpdates ?? false
+        lastCheckDate = driver?.lastUpdateCheckDate
+    }
+
+    static func isSupportedHost() -> Bool {
+        let bundle = Bundle.main
+        return permits(bundleIdentifier: bundle.bundleIdentifier,
+                       isApplication: bundle.bundleURL.pathExtension == "app",
+                       feed: bundle.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+                       key: bundle.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
+                       signedFeed: bundle.object(forInfoDictionaryKey: "SURequireSignedFeed") as? Bool ?? false,
+                       verifiedExtraction: bundle.object(forInfoDictionaryKey: "SUVerifyUpdateBeforeExtraction") as? Bool ?? false,
+                       isTestProcess: ProcessInfo.processInfo.environment["KEYWEAVE_TEST_HOME"] != nil)
+    }
+
+    nonisolated static func permits(bundleIdentifier: String?, isApplication: Bool,
+                                    feed: String?, key: String?, signedFeed: Bool,
+                                    verifiedExtraction: Bool, isTestProcess: Bool) -> Bool {
+        !isTestProcess && isApplication && bundleIdentifier == ProductIdentity.bundleIdentifier
+            && feed == feedURL && key == publicKey && signedFeed && verifiedExtraction
+    }
 
     /// "1.10.0" > "1.9.2"; pre-release suffixes are ignored.
     nonisolated static func isNewer(_ a: String, than b: String) -> Bool {
