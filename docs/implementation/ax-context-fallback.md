@@ -1,6 +1,6 @@
 # AX-context fallback without Screen Recording
 
-Status: implemented for review, unmerged. This is the first bounded correctness slice (P1.1) after the approved Gate 0 merge at `9ef5dd2c02c57435f5653e69c6b658cc6a5b832d`. The [Gate 0 isolation gates](gate0-isolation.md) remain off, including context and input monitoring. This change repairs the source-selection path without enabling live context acquisition or changing permissions.
+Status: merged in [PR #7](https://github.com/DevAnuhas/keyweave/pull/7). This is the first bounded correctness slice (P1.1) after the approved Gate 0 merge at `9ef5dd2c02c57435f5653e69c6b658cc6a5b832d`. The [Gate 0 isolation gates](gate0-isolation.md) remain off, including context and input monitoring. This change repairs the source-selection path without enabling live context acquisition or changing permissions.
 
 ## Contract and implementation
 

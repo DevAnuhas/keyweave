@@ -1,6 +1,6 @@
 /// The fork's external identity. Internal Swift module and target names stay TabType.
 public enum ProductIdentity {
-    public static let name = "Keyweave"
+    public static let name = "KeyWeaver"
     public static let bundleIdentifier = "dev.anuhas.keyweave"
     public static let preferencesDomain = "dev.anuhas.keyweave"
     public static let keychainService = "dev.anuhas.keyweave.sync"

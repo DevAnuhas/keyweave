@@ -1,31 +1,24 @@
-# Keyweave
+# KeyWeaver
 
 ## Direction
 
-A free, local-first macOS writing-autocomplete application, developed from [nilava/TabType](https://github.com/nilava/TabType). Keyweave is the working name, not a trademark-cleared brand. Preserve TabType attribution and its MIT license.
+A free, local-first macOS writing-autocomplete application developed from [nilava/TabType](https://github.com/nilava/TabType). Preserve the upstream MIT license and history. Current branding is KeyWeaver; bundle/preferences identifiers and storage folders deliberately retain the isolated Keyweave namespace.
 
-The target is the useful behavior of the complete current Cotypist feature set, including Pro and Labs, with independently written changes and explicit verification. Public changelogs define research questions and regression scenarios, not proof of the installed binary's behavior.
+The target remains useful Cotypist capabilities, including Pro/Labs writing features, implemented independently and verified with synthetic acceptance scenarios. Vendor claims, source implementation, observed behavior and measured quality are separate evidence.
 
-## Current state
+## Current state — 2026-10-30
 
-- Public fork: https://github.com/DevAnuhas/keyweave
-- Upstream source baseline: `b75ea0e22bc565e57b133b2625a49d7e8a24c789` on `main`.
-- Latest upstream downloadable baseline inspected: v2.1.0, commit `6ffca7c56f231aed1ed3eacd635561f0b9813d4b`.
-- The inherited source already contains OCR/clipboard context, writing personalization, instructions, mid-line completion, alternatives, selected-text replacements and encrypted cross-Mac sync. Validate those paths rather than treating them as new work.
-- This bootstrap adds guidance, a partial official release-history index and a research/build handoff. It does not rename the executable, change its behavior, establish runtime parity, or produce a Keyweave release.
-- The recovered official notes expose four version identities across two note bodies, not the full lifetime archive. Preserve the [coverage gaps](docs/research/COTYPIST-HISTORY.md).
-- Cotypist's published terms prohibit modification/decompilation. That research phase requires written permission or qualified legal clearance for the intended scope; public-document and normal UI-behavior research can proceed meanwhile.
-- Native implementation, target-app investigation and Mac acceptance must run on macOS. No Mac build or Cotypist binary analysis has been performed by this bootstrap.
+- Public repository: https://github.com/DevAnuhas/keyweave.
+- Gate 0 PRs #3–#6, bootstrap PR #2 and AX-fallback PR #7 are merged. Native isolation tests, synthetic launch and Settings reopening evidence are in [implementation reports](docs/README.md).
+- Preview line: `0.1.0`/build `12`, tag `v0.1.0-preview.1`, Apple Silicon/macOS 14+. It introduces original app/logo/menu artwork and a Developer ID/notarization pipeline. Actual signed/stapled artifacts and receipts establish release acceptance; see the [verification report](docs/implementation/keyweaver-preview.md), [runbook](docs/runbooks/releasing.md) and GitHub release notes.
+- Input monitoring/suggestions, context capture, clipboard context, writing memory, sync, login registration and automatic updates remain off. The preview is not a usable daily autocomplete build. Existing explicit manual model actions remain available; a model download does not enable suggestions.
+- Isolated bundle ID is `dev.anuhas.keyweave`. No automatic upstream data access/migration, global macOS preference write, model resume or OCR diagnostic is permitted. [Gate 0 boundary](docs/implementation/gate0-isolation.md).
+- The shared context-source reader now allows eligible AX text without Screen Recording and skips OCR entirely when denied. Its production wiring is tested with synthetic readers; enabled live AX/OCR acquisition remains unverified. [AX fallback evidence](docs/implementation/ax-context-fallback.md).
+- Existing model, personalization, instructions, mid-line, alternatives, synonyms and sync implementations are retained. Verify concrete gaps instead of rebuilding them.
+- Cotypist history is incomplete. Preserve [coverage gaps](docs/research/COTYPIST-HISTORY.md); no feature-parity certification exists. Current target Pro/Labs behavior and REA attachment to the running Codex thread remain unresolved.
 
-## First executable outcome
+## Next correctness boundaries
 
-Isolate the fork's identity, updater and stored data before running it. Then reproduce the inherited app on synthetic fixtures, study Cotypist feature-by-feature, and implement the verified gaps in small reviewable slices. See [the milestone](docs/MILESTONE.md) and [identity requirements](docs/FORK-IDENTITY.md).
+Fail closed on capture app/window identity before enabling capture; then fix clipboard ownership/restoration, stale picker/selection identity, alternatives spacing and key lifecycle. Activation of retained services needs effective-consent and controlled-host evidence. Do not enable a service merely to make a preview look functional.
 
-## Open prerequisites
-
-- Actual installed Cotypist version/build and authorized plan capabilities.
-- Local native-analysis engine availability and REA readiness.
-- Target-app/macOS/language acceptance matrix and measured baseline.
-- Developer ID/notarization capability for a distributable build. A self-signed development certificate is not Apple notarization.
-
-Do not turn an unknown into a silent scope cut or a parity claim. The [research map](docs/research/README.md) owns evidence and coverage limits.
+Keep Cotypist binaries/assets, personal writing, credentials, private notary receipts and analysis outside public git. Cotypist decompilation remains outside the authorized scope. No paid service or purchase is authorized by the release task.

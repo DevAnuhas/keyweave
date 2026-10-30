@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "llama_release": "b11490",
+  "resource_provenance": {
+    "Sources/TabType/Resources/frequency_dictionary_en.txt": {
+      "repository": "wolfgarbe/SymSpell",
+      "commit": "91fe939e9c1259813ee817e95239629c5badf8ec",
+      "path": "SymSpell/frequency_dictionary_en_82_765.txt",
+      "blob": "3682dedea3400a7f3ff34d521844c9c0c427ed74",
+      "bytes": 1332881,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "SymSpell MIT; Google Books CC-BY-3.0; SCOWL notices"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_bn.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/bn/bn_50k.txt",
+      "blob": "262022f73e9356e78e8aef0010818389fea21f64",
+      "bytes": 1119693,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_de.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/de/de_50k.txt",
+      "blob": "f4addcc9aafb4ddf710cc20694f2cfd90283a775",
+      "bytes": 662497,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_es.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/es/es_50k.txt",
+      "blob": "bc78eb9f7dab5c1c83a43b80914447747b91b97a",
+      "bytes": 658626,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_fr.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/fr/fr_50k.txt",
+      "blob": "884ac1763d0791b2d79ec9f07edc68751e012319",
+      "bytes": 653452,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_hi.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/hi/hi_full.txt",
+      "blob": "6036afb5137ab3caa4053418f8ad1f234a1bdcd6",
+      "bytes": 437828,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_it.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/it/it_50k.txt",
+      "blob": "e73d1900784da088d74697350c9cb21210f4dcdd",
+      "bytes": 653205,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_ml.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/ml/ml_50k.txt",
+      "blob": "2e0898e60295667375694e88a40a2197d307486f",
+      "bytes": 1545908,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_pt.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/pt/pt_50k.txt",
+      "blob": "9f71ace9efc9b003c4fc8948c7dc24c42e7b7000",
+      "bytes": 652361,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_ta.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/ta/ta_full.txt",
+      "blob": "62260dad728f3b13bf9b0f992f42cf2d9965f663",
+      "bytes": 562582,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_te.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/te/te_full.txt",
+      "blob": "fc2e20fb91bcc70e834b8c0415281215a2fb0bf0",
+      "bytes": 312669,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/frequency_dictionary_ur.txt": {
+      "repository": "hermitdave/FrequencyWords",
+      "commit": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "path": "content/2018/ur/ur_full.txt",
+      "blob": "2778dab5b47bdadd8c56df1d484d3c5a0946c9d0",
+      "bytes": 120771,
+      "changes": "Local filename changed; content bytes unchanged",
+      "license": "CC-BY-SA-4.0"
+    },
+    "Sources/TabType/Resources/emoji.json": {
+      "repository": "github/gemoji",
+      "commit": "fadaeaf1f1a9be82b321316a6c5502e43138b2f6",
+      "path": "db/emoji.json",
+      "upstream_blob": "65d4c8db9b110c241c7238ac0b0bbae6f8e6d0d7",
+      "local_blob": "2af7c31ebd4ccc5f50866466c56207828da84ba7",
+      "entries": 1870,
+      "bytes": 153175,
+      "license": "MIT",
+      "changes": "Inherited deterministic transform: code=aliases[0], char=emoji, keywords=stable_unique(tags+aliases[1:]+description.lower().split()), st=true iff skin_tones; json.dumps ensure_ascii=False; no newline"
+    }
+  },
+  "license_source_urls": {
+    "gemoji-MIT.txt": "https://raw.githubusercontent.com/github/gemoji/fadaeaf1f1a9be82b321316a6c5502e43138b2f6/LICENSE",
+    "SymSpell-MIT.txt": "https://raw.githubusercontent.com/wolfgarbe/SymSpell/91fe939e9c1259813ee817e95239629c5badf8ec/LICENSE",
+    "FrequencyWords-code-MIT.txt": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/525f9b560de45753a5ea01069454e72e9aa541c6/LICENSE",
+    "SCOWL-Copyright.txt": "https://raw.githubusercontent.com/en-wl/wordlist/b22230cc5250887737fdefe9ca4c9d9d01230eaa/scowl/Copyright",
+    "llama.cpp-MIT.txt": "https://raw.githubusercontent.com/ggml-org/llama.cpp/b11490/LICENSE",
+    "xxHash-BSD-2-Clause.txt": "https://raw.githubusercontent.com/ggml-org/llama.cpp/b11490/vendor/hash/xxhash/LICENSE",
+    "CC-BY-SA-4.0.txt": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC-BY-SA-4.0.txt",
+    "CC-BY-3.0.txt": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC-BY-3.0.txt"
+  },
+  "note": "Full license/notice texts accompany this manifest. Eight font OFL notices remain alongside their fonts. SCOWL notice revision is a current official v1 snapshot, not a claim to pin the older sub-version used by SymSpell.",
+  "notice_file_sha256": {
+    "CC-BY-3.0.txt": "e6bc9e9c474700b708f568bac9e5a8a9bcb2b1dad53442f5ba449fcb848b8e76",
+    "CC-BY-SA-4.0.txt": "cde7883b9050a1104f4ac19a1572aafd6e5d7323b68351aaf51fbf4beba54966",
+    "FrequencyWords-code-MIT.txt": "e08d916cc953f85f7dfa0df530f6d7931f14ce804d053602662d8649b5fac829",
+    "SCOWL-Copyright.txt": "283326a422e29c510e2ba6805518c418ce3c35ed1fadc3eec83d2da4f6c5a055",
+    "SymSpell-MIT.txt": "858e5c7e7a38824f33cf466719509884f2ee5e35992dbfce377fec0656545814",
+    "gemoji-MIT.txt": "7ea1d1fd0602e6623b9a65e791499a0ea5a2f5f60f91bfad78cbaeee19da26e6",
+    "llama.cpp-MIT.txt": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+    "xxHash-BSD-2-Clause.txt": "6ffedbc0f7878612d2b23589f1ff2ab15633e1df7963a5d9fc750ec5500c7e7a"
+  }
+}

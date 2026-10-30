@@ -4,7 +4,7 @@ import TabTypeKit
 
 final class ProductIdentityTests: XCTestCase {
     func testAppBundleAndPersistentIdentitiesBelongToKeyweave() throws {
-        XCTAssertEqual(ProductIdentity.name, "Keyweave")
+        XCTAssertEqual(ProductIdentity.name, "KeyWeaver")
         XCTAssertEqual(ProductIdentity.bundleIdentifier, "dev.anuhas.keyweave")
         XCTAssertEqual(ProductIdentity.preferencesDomain, "dev.anuhas.keyweave")
         XCTAssertEqual(ProductIdentity.keychainService, "dev.anuhas.keyweave.sync")
@@ -79,11 +79,11 @@ final class ProductIdentityTests: XCTestCase {
                             at: fixture.appendingPathComponent("Scripts/build.sh"))
         let before = try snapshot(fixture)
 
-        let result = try runScript(script, arguments: ["0.0.0-gate0"], fixture: fixture,
+        let result = try runScript(script, arguments: [], fixture: fixture,
                                    environment: ["KEYWEAVE_TEST_CALLS": calls.path])
 
         XCTAssertNotEqual(result.status, 0)
-        XCTAssertTrue(result.output.contains("fork-owned distribution"), result.output)
+        XCTAssertTrue(result.output.contains("Release requires SIGN_IDENTITY"), result.output)
         XCTAssertEqual(try Data(contentsOf: plist), originalPlist)
         XCTAssertFalse(manager.fileExists(atPath: calls.path), "Release must refuse before calling tools")
         XCTAssertEqual(try snapshot(fixture), before)
@@ -127,14 +127,14 @@ final class ProductIdentityTests: XCTestCase {
                                    environment: ["KEYWEAVE_TEST_CALLS": calls.path])
 
         XCTAssertEqual(result.status, 0, result.output)
-        let app = fixture.appendingPathComponent("dist/Keyweave.app")
-        let executable = app.appendingPathComponent("Contents/MacOS/Keyweave")
+        let app = fixture.appendingPathComponent("dist/KeyWeaver.app")
+        let executable = app.appendingPathComponent("Contents/MacOS/KeyWeaver")
         XCTAssertTrue(manager.fileExists(atPath: executable.path), result.output)
         if manager.fileExists(atPath: executable.path) {
             XCTAssertEqual(try String(contentsOf: executable, encoding: .utf8), "synthetic executable")
             let data = try Data(contentsOf: app.appendingPathComponent("Contents/Info.plist"))
             let plist = try XCTUnwrap(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
-            XCTAssertEqual(plist["CFBundleExecutable"] as? String, "Keyweave")
+            XCTAssertEqual(plist["CFBundleExecutable"] as? String, "KeyWeaver")
             XCTAssertEqual(plist["CFBundleIdentifier"] as? String, "dev.anuhas.keyweave")
             XCTAssertEqual(try String(contentsOf: app.appendingPathComponent("Contents/Resources/TabType_TabType.bundle/resource"),
                                       encoding: .utf8), "synthetic resource")
@@ -223,7 +223,7 @@ final class ProductIdentityTests: XCTestCase {
         for directory in ["Scripts", "Resources", "bin"] {
             try FileManager.default.createDirectory(at: root.appendingPathComponent(directory), withIntermediateDirectories: true)
         }
-        return root
+        return root.resolvingSymlinksInPath()
     }
 
     private func writeExecutable(_ contents: String, at url: URL) throws {
@@ -242,6 +242,9 @@ final class ProductIdentityTests: XCTestCase {
             "KEYWEAVE_TEST_HOME": fixture.appendingPathComponent("synthetic-home").path,
             "SIGN_IDENTITY": "",
             "CONFIG": "Debug",
+            "RELEASE": "0",
+            "DEVELOPMENT_TEAM": "",
+            "KEYCHAIN_PROFILE": "",
         ].merging(environment) { _, new in new }) { _, new in new }
         let output = Pipe()
         process.standardOutput = output
