@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// At-a-glance setup dashboard (like Cotypist's Setup screen): permission grants,
 /// model download state, and the couple of toggles that matter for first use —
@@ -13,6 +14,11 @@ struct SetupPane: View {
     private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var modelReady: Bool { models.isLoaded }
+    private var screenshotsEnabled: Bool { settings.useScreenContext || settings.useScreenshotAppearance }
+    private var screenPermissionAction: (String, () -> Void)? {
+        guard screenshotsEnabled && !screenOK else { return nil }
+        return ("Grant", { ScreenContextProvider.shared.requestPermission() })
+    }
     private var allSet: Bool { trusted && modelReady && settings.isEnabled && settings.inputMonitoringState == .active }
 
     var body: some View {
@@ -49,10 +55,10 @@ struct SetupPane: View {
                     doneLabel: settings.inputMonitoringState == .active ? "Running" : "Not running")
 
                 statusRow(
-                    ok: screenOK, title: "Screen Recording permission",
-                    detail: "Screen context and appearance capture are off in this build.",
-                    action: nil,
-                    doneLabel: "Off")
+                    ok: !screenshotsEnabled || screenOK, title: "Screen Recording permission",
+                    detail: "Optional — required for screenshots when context or appearance capture is enabled.",
+                    action: screenPermissionAction,
+                    doneLabel: screenOK ? "Granted" : "Optional")
 
                 modelRow
 
@@ -62,8 +68,7 @@ struct SetupPane: View {
 
             Section("Optional") {
                 Toggle("Use clipboard as context", isOn: $settings.useClipboardContext)
-                    .disabled(!AppSafetyPolicy.clipboardContextEnabled)
-                Text("When on, KeyWeave reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
+                Text("When on, recent copied text can inform local suggestions. Clipboard context is not saved.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

@@ -1,7 +1,5 @@
 import AppKit
-import ImageIO
 import TabTypeKit
-import UniformTypeIdentifiers
 
 /// Measured appearance of the text in a field: which font, size and colours it
 /// renders with, and where its baseline sits relative to the caret rect. Fitted
@@ -30,14 +28,19 @@ final class FieldFitCache {
     static let minimumVerticalConfidence = 0.8
 
     private var fits: [String: Fit] = [:]
+    private var targets: [String: WindowCaptureTarget] = [:]
     private var inFlight: Set<String> = []
     private let paths: AppPaths
     private let screenCaptureAllowed: () -> Bool
+    private let appearanceEnabled: () -> Bool
+    private var generation = UUID()
 
     init(paths: AppPaths = .current,
-         screenCaptureAllowed: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
+         screenCaptureAllowed: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
+         appearanceEnabled: @escaping () -> Bool = { AppSettings.shared.useScreenshotAppearance }) {
         self.paths = paths
         self.screenCaptureAllowed = screenCaptureAllowed
+        self.appearanceEnabled = appearanceEnabled
     }
 
     /// Cached or freshly measured fit for the field at `caret`. nil when the text
@@ -45,8 +48,9 @@ final class FieldFitCache {
     /// `knownSize`: the size the app reported over AX — only the family is fitted.
     func fit(caret: CGRect, fieldFrame: CGRect?, key: String, lineText: String, verbose: Bool,
              knownSize: CGFloat? = nil) async -> Fit? {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
-        if let cached = fits[key], Date().timeIntervalSince(cached.created) < 600 { return cached }
+        guard appearanceEnabled(), let target = WindowCaptureTarget.current() else { return nil }
+        let requestedGeneration = generation
+        if let cached = fits[key], targets[key] == target, Date().timeIntervalSince(cached.created) < 600 { return cached }
         guard !inFlight.contains(key), screenCaptureAllowed() else { return nil }
         let line = String(lineText.split(separator: "\n", omittingEmptySubsequences: false).last ?? "")
         guard line.trimmingCharacters(in: .whitespaces).count >= 6 else { return nil }
@@ -79,7 +83,8 @@ final class FieldFitCache {
                                   knownSize: knownSize.map(Double.init))
         }.value
         let ms = Int(Date().timeIntervalSince(start) * 1000)
-        if verbose { dump(image, key: key) }
+        guard appearanceEnabled(), generation == requestedGeneration,
+              WindowCaptureTarget.current() == target else { return nil }
 
         guard let result else {
             Log.shared.debug("placement: fit gave no result (\(ms)ms)")
@@ -95,17 +100,23 @@ final class FieldFitCache {
                       textColor: Self.color(result.inkColor), backgroundColor: Self.color(result.background),
                       confidence: result.confidence, familyMatched: familyMatched, created: Date())
         fits[key] = fit
+        targets[key] = target
         return fit
     }
 
     /// The cached fit, if fresh — no measuring.
     func cached(key: String) -> Fit? {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
-        guard let fit = fits[key], Date().timeIntervalSince(fit.created) < 600 else { return nil }
+        guard appearanceEnabled() else { return nil }
+        guard let fit = fits[key], targets[key] == WindowCaptureTarget.current(),
+              Date().timeIntervalSince(fit.created) < 600 else { return nil }
         return fit
     }
 
-    func invalidate() { fits.removeAll() }
+    func invalidate() {
+        generation = UUID()
+        fits.removeAll()
+        targets.removeAll()
+    }
 
     private static func font(_ fit: FontFit) -> NSFont? {
         let size = CGFloat(fit.pointSize)
@@ -117,15 +128,4 @@ final class FieldFitCache {
         NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
     }
 
-    /// Verbose mode: keep the captured strips for diagnosing placement.
-    private func dump(_ image: CGImage, key: String) {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return }
-        let dir = paths.fitCapturesDirectory
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let name = "\(Int(Date().timeIntervalSince1970))-\(abs(key.hashValue) % 100_000).png"
-        guard let dest = CGImageDestinationCreateWithURL(dir.appendingPathComponent(name) as CFURL,
-                                                         UTType.png.identifier as CFString, 1, nil) else { return }
-        CGImageDestinationAddImage(dest, image, nil)
-        CGImageDestinationFinalize(dest)
-    }
 }

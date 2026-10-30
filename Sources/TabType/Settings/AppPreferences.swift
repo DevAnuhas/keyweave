@@ -2,16 +2,16 @@ import CryptoKit
 import Foundation
 import TabTypeKit
 
-/// Core autocomplete is available. The retained optional acquisition/sync
-/// services stay closed until their consent and compatibility work is complete.
+/// Available capabilities. Acquiring context, storing writing and syncing still
+/// require their separate, local opt-in settings at every entry point.
 enum AppSafetyPolicy {
     static let inputMonitoringEnabled = true
-    static let syncEnabled = false
-    static let writingEnabled = false
-    static let screenContextEnabled = false
-    static let clipboardContextEnabled = false
-    static let screenshotAppearanceEnabled = false
-    static let launchAtLoginEnabled = false
+    static let syncEnabled = true
+    static let writingEnabled = true
+    static let screenContextEnabled = true
+    static let clipboardContextEnabled = true
+    static let screenshotAppearanceEnabled = true
+    static let launchAtLoginEnabled = true
 }
 
 @MainActor

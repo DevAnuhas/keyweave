@@ -5,12 +5,10 @@ import Foundation
 import Security
 import TabTypeKit
 
-/// Sync between Macs through iCloud Drive, end-to-end encrypted (Cotypist syncs
-/// over iCloud too; CloudKit needs a paid developer account, iCloud Drive
-/// doesn't). Each Mac writes one AES-GCM-sealed file to
+/// Opt-in sync through iCloud Drive. Each Mac writes one AES-GCM-sealed file to
 /// iCloud Drive/Keyweave Sync/ with its settings and learned writing; the key is
 /// derived from a passphrase the user sets on every Mac, so Apple only ever
-/// stores ciphertext. Merge: the newest settings win; writing is combined.
+/// stores ciphertext. Local privacy controls never follow another Mac.
 @MainActor
 final class SyncManager: ObservableObject {
     static let shared = SyncManager()
@@ -20,15 +18,20 @@ final class SyncManager: ObservableObject {
 
     private let defaults: UserDefaults
     private let injectedSettings: AppSettings?
+    private var injectedWritingStore: WritingStore?
     private var settings: AppSettings { injectedSettings ?? AppSettings.shared }
+    private var writingStore: WritingStore { injectedWritingStore ?? WritingStore.shared }
     private var settingsWatch: AnyCancellable?
     private var timer: Timer?
     private var pendingSync: DispatchWorkItem?
     private var applyingRemote = false
+    private var running = false
+    private var lastSettingsSnapshot: SyncedSettings?
 
     private static let enabledKey = "syncEnabled"
     private static let machineKey = "syncMachineID"
     private static let settingsChangedKey = "syncSettingsChangedAt"
+    private static let publishedSettingsKey = "syncPublishedSharedSettings"
     private let paths: AppPaths
     private let system: SyncSystemBoundary
 
@@ -43,13 +46,13 @@ final class SyncManager: ObservableObject {
     }
 
     var hasPassphrase: Bool {
-        guard AppSafetyPolicy.syncEnabled else { return false }
+        guard enabled else { return false }
         return system.readPassphrase(ProductIdentity.keychainService) != nil
     }
 
     /// iCloud Drive's folder for Keyweave (nil while sync is unavailable).
     var folder: URL? {
-        guard AppSafetyPolicy.syncEnabled else { return nil }
+        guard enabled else { return nil }
         let drive = paths.syncDirectory.deletingLastPathComponent()
         guard system.cloudDriveExists(drive) else { return nil }
         return paths.syncDirectory
@@ -76,47 +79,103 @@ final class SyncManager: ObservableObject {
         self.system = system
     }
 
+    convenience init(defaults: UserDefaults, settings: AppSettings?, paths: AppPaths,
+                     system: SyncSystemBoundary, writingStore: WritingStore?) {
+        self.init(defaults: defaults, settings: settings, paths: paths, system: system)
+        injectedWritingStore = writingStore
+    }
+
     func start() {
-        guard AppSafetyPolicy.syncEnabled, enabled else { return }
+        guard enabled, !running else { return }
+        running = true
+        prepareSettingsSnapshot()
         settingsWatch = settings.objectWillChange.sink { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, !self.applyingRemote else { return }
-                self.settingsChangedAt = Date()
-                self.scheduleSync(after: 5)
+                // objectWillChange arrives before the actual property change.
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.enabled, self.running, !self.applyingRemote else { return }
+                    self.markChangedSettings()
+                }
             }
         }
-        WritingStore.shared.onSyncNeeded = { [weak self] in self?.scheduleSync(after: 30) }
+        writingStore.onSyncNeeded = { [weak self] in
+            guard let self, !self.applyingRemote else { return }
+            self.scheduleSync(after: 30)
+        }
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 10 * 60, repeats: true) { _ in
-            MainActor.assumeIsolated { SyncManager.shared.syncNow() }
+        timer = Timer.scheduledTimer(withTimeInterval: 10 * 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncNow() }
         }
         syncNow()
     }
 
     func stop() {
+        let wasRunning = running
+        running = false
         settingsWatch = nil
         timer?.invalidate()
         timer = nil
         pendingSync?.cancel()
         pendingSync = nil
-        guard AppSafetyPolicy.syncEnabled else { return }
-        WritingStore.shared.onSyncNeeded = nil
+        lastSettingsSnapshot = nil
+        if wasRunning { writingStore.onSyncNeeded = nil }
     }
 
     func setPassphrase(_ passphrase: String) {
-        guard AppSafetyPolicy.syncEnabled else { return }
+        guard enabled else { return }
         guard passphrase.count >= 8 else { status = "Use at least 8 characters"; return }
-        system.storePassphrase(ProductIdentity.keychainService, passphrase)
+        do {
+            try system.storePassphrase(ProductIdentity.keychainService, passphrase)
+        } catch {
+            status = "Keychain could not save the sync passphrase. Its existing value was kept; check access and try again."
+            return
+        }
         objectWillChange.send()
         syncNow()
     }
 
     private func scheduleSync(after delay: TimeInterval) {
-        guard AppSafetyPolicy.syncEnabled else { return }
+        guard enabled else { return }
         pendingSync?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.syncNow() }
         pendingSync = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func transferableSettings() -> SyncedSettings {
+        var snapshot = settings.syncSnapshot
+        snapshot.useScreenContext = false
+        snapshot.useClipboardContext = false
+        snapshot.useScreenshotAppearance = false
+        snapshot.collectTypingHistory = false
+        snapshot.recordWithoutAccepts = false
+        for key in snapshot.appOverrides.keys {
+            snapshot.appOverrides[key]?.readConversation = nil
+            snapshot.appOverrides[key]?.learnFromWriting = nil
+        }
+        return snapshot
+    }
+
+    private func markChangedSettings() {
+        let current = transferableSettings()
+        guard let previous = lastSettingsSnapshot, current != previous else { return }
+        lastSettingsSnapshot = current
+        settingsChangedAt = Date()
+        scheduleSync(after: 5)
+    }
+
+    private func prepareSettingsSnapshot() {
+        guard lastSettingsSnapshot == nil else { return }
+        let current = transferableSettings()
+        if let data = defaults.data(forKey: Self.publishedSettingsKey),
+           let published = try? JSONDecoder().decode(SyncedSettings.self, from: data),
+           current != published {
+            // No observers run while sync is off. Detect those local edits on
+            // re-entry; a first-time join has no published baseline to compare.
+            settingsChangedAt = Date()
+        }
+        lastSettingsSnapshot = current
     }
 
     // MARK: Sync
@@ -127,14 +186,21 @@ final class SyncManager: ObservableObject {
         var settingsChangedAt: Date
         var settings: SyncedSettings
         var writing: [WritingStore.Document]
+        var erasure: WritingStore.Erasure?
     }
 
     func syncNow() {
         guard AppSafetyPolicy.syncEnabled, enabled else { return }
         guard let folder else { status = "Turn on iCloud Drive to sync"; return }
-        guard let passphrase = system.readPassphrase(ProductIdentity.keychainService) else { status = "Set a sync passphrase"; return }
+        guard let passphrase = system.readPassphrase(ProductIdentity.keychainService) else {
+            status = "Set a sync passphrase, or unlock Keychain if one is already saved"
+            return
+        }
         do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            prepareSettingsSnapshot()
+            markChangedSettings()
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
             let key = try Self.key(passphrase: passphrase, salt: try Self.salt(in: folder))
 
             // Read the other Macs first, then write ours with the merged result.
@@ -150,20 +216,33 @@ final class SyncManager: ObservableObject {
                     continue
                 }
                 others += 1
-                WritingStore.shared.merge(payload.writing)
-                if payload.settingsChangedAt > settingsChangedAt {
-                    applyingRemote = true
-                    settings.apply(payload.settings)
+                applyingRemote = true
+                do {
+                    try writingStore.mergeSyncState(.init(writing: payload.writing, erasure: payload.erasure))
+                } catch {
                     applyingRemote = false
-                    settingsChangedAt = payload.settingsChangedAt
+                    throw error
                 }
+                if payload.settingsChangedAt > settingsChangedAt {
+                    settings.apply(payload.settings)
+                    settingsChangedAt = payload.settingsChangedAt
+                    lastSettingsSnapshot = transferableSettings()
+                }
+                applyingRemote = false
             }
 
-            let mine = Payload(machine: Host.current().localizedName ?? "Mac", written: Date(),
-                               settingsChangedAt: settingsChangedAt, settings: settings.syncSnapshot,
-                               writing: WritingStore.shared.allDocuments)
+            if settingsChangedAt == .distantPast { settingsChangedAt = Date() }
+            let writing = try writingStore.stateForSync()
+            let mine = Payload(machine: "Mac", written: Date(),
+                               settingsChangedAt: settingsChangedAt, settings: transferableSettings(),
+                               writing: writing.writing, erasure: writing.erasure)
+            let publishedSettings = try JSONEncoder().encode(mine.settings)
             let sealed = try AES.GCM.seal(try JSONEncoder().encode(mine), using: key).combined!
-            try sealed.write(to: folder.appendingPathComponent("\(machineID).\(ProductIdentity.syncFileExtension)"), options: .atomic)
+            let destination = folder.appendingPathComponent("\(machineID).\(ProductIdentity.syncFileExtension)")
+            try sealed.write(to: destination, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+            defaults.set(publishedSettings, forKey: Self.publishedSettingsKey)
+            lastSettingsSnapshot = mine.settings
 
             otherMacs = others
             let time = Date().formatted(date: .omitted, time: .shortened)
@@ -181,11 +260,20 @@ final class SyncManager: ObservableObject {
     /// The folder's shared random salt (made by the first Mac to sync).
     private static func salt(in folder: URL) throws -> Data {
         let url = folder.appendingPathComponent("salt")
-        if let salt = try? Data(contentsOf: url), salt.count == 16 { return salt }
+        if FileManager.default.fileExists(atPath: url.path) {
+            let salt = try Data(contentsOf: url)
+            guard salt.count == 16 else { throw CocoaError(.coderInvalidValue) }
+            return salt
+        }
         var bytes = [UInt8](repeating: 0, count: 16)
         guard SecRandomCopyBytes(kSecRandomDefault, 16, &bytes) == errSecSuccess else { throw CocoaError(.fileWriteUnknown) }
         let salt = Data(bytes)
-        try salt.write(to: url, options: .atomic)
+        do { try salt.write(to: url, options: .withoutOverwriting) }
+        catch {
+            let existing = try Data(contentsOf: url)
+            guard existing.count == 16 else { throw CocoaError(.coderInvalidValue) }
+            return existing
+        }
         return salt
     }
 
@@ -209,7 +297,7 @@ final class SyncManager: ObservableObject {
 @MainActor
 struct SyncSystemBoundary {
     var readPassphrase: @MainActor (String) -> String?
-    var storePassphrase: @MainActor (String, String) -> Void
+    var storePassphrase: @MainActor (String, String) throws -> Void
     var cloudDriveExists: @MainActor (URL) -> Bool
 
     static let live = SyncSystemBoundary(
@@ -221,20 +309,27 @@ struct SyncSystemBoundary {
         guard AppSafetyPolicy.syncEnabled else { return nil }
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                     kSecAttrService as String: service,
-                                    kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+                                    kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne,
+                                    kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail]
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    private static func storePassphrase(service: String, passphrase: String) {
+    private static func storePassphrase(service: String, passphrase: String) throws {
         guard AppSafetyPolicy.syncEnabled else { return }
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                    kSecAttrService as String: service]
-        SecItemDelete(base as CFDictionary)
-        var add = base
-        add[kSecValueData as String] = Data(passphrase.utf8)
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(add as CFDictionary, nil)
+        let value = Data(passphrase.utf8)
+        var status = SecItemUpdate(base as CFDictionary, [kSecValueData as String: value] as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = base
+            add[kSecValueData as String] = value
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            status = SecItemAdd(add as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
     }
 }

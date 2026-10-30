@@ -117,7 +117,8 @@ private struct GhostPreview: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var settings: AppSettings
-    @State private var launchAtLogin = LaunchAtLogin.isEnabled
+    @State private var loginStatus = LaunchAtLogin.Status.disabled
+    @State private var loginError: String?
 
     var body: some View {
         Form {
@@ -130,9 +131,19 @@ struct GeneralSettingsView: View {
                     Text("Input monitoring is off in this build.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Toggle("Launch KeyWeave at login", isOn: $launchAtLogin)
-                    .disabled(!AppSafetyPolicy.launchAtLoginEnabled)
-                    .onChange(of: launchAtLogin) { _, on in LaunchAtLogin.set(on) }
+                Toggle("Launch KeyWeave at login", isOn: Binding(
+                    get: { loginStatus.isRequested }, set: setLaunchAtLogin))
+                if loginStatus == .requiresApproval {
+                    Text("Allow KeyWeave in System Settings → General → Login Items before it can launch at login.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Open Login Items…") { LaunchAtLogin.openSystemSettings() }
+                } else if loginStatus == .unavailable {
+                    Text("No login item is registered. Turn on the switch to request registration.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let loginError {
+                    Text(loginError).font(.caption).foregroundStyle(.red)
+                }
                 Toggle("Show menu bar icon", isOn: $settings.showMenuBarIcon)
                 Toggle("Show floating accessory button", isOn: $settings.showAccessoryButton)
                 Text("macOS text suggestions are managed in System Settings. KeyWeave does not change that preference.")
@@ -170,6 +181,27 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear(perform: refreshLoginStatus)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLoginStatus()
+        }
+    }
+
+    private func refreshLoginStatus() {
+        let actual = LaunchAtLogin.status
+        if actual != loginStatus { loginError = nil }
+        loginStatus = actual
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        switch LaunchAtLogin.set(enabled) {
+        case .success(let status):
+            loginStatus = status
+            loginError = status.isRequested == enabled ? nil : "macOS did not change the login-item setting. Try again from the installed app."
+        case .failure(let error):
+            loginStatus = LaunchAtLogin.status
+            loginError = "Could not change launch at login: \(error.localizedDescription)"
+        }
     }
 }
 

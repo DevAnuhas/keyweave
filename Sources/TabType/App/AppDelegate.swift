@@ -4,6 +4,10 @@ import Combine
 import SwiftUI
 import TabTypeKit
 
+extension Notification.Name {
+    static let tabTypePrivacyChanged = Notification.Name("dev.anuhas.keyweave.privacyChanged")
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     private let settings = AppSettings.shared
@@ -72,6 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Autocorrect and the typo gate on suggestions both use it.
         SpellChecker.shared.loadIfNeeded(language: settings.autocorrectLanguage)
 
+        configureOptionalServices()
         llamaModels.start()
         refreshInputMonitoring()
         // A new bundle needs its own grant. Detect grants/revocations without
@@ -83,6 +88,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // an unfinished model/permission setup.
         SettingsNavigator.shared.pendingSection = .setup
         openSettings()
+    }
+
+    private func configureOptionalServices() {
+        if settings.collectTypingHistory {
+            WritingStore.shared.start()
+            PersonalIndex.shared.start()
+        }
+        // start() checks its own persisted, local opt-in before any system access.
+        SyncManager.shared.start()
+        settings.$collectTypingHistory.dropFirst().removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled in
+                if enabled {
+                    WritingStore.shared.start()
+                    PersonalIndex.shared.start()
+                } else {
+                    WritingStore.shared.stopCollection()
+                    PersonalIndex.shared.stop()
+                }
+                self?.engine.optionalFeaturesDidChange()
+            }.store(in: &cancellables)
+        settings.$useScreenContext.combineLatest(settings.$useClipboardContext, settings.$useScreenshotAppearance)
+            .dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.engine.optionalFeaturesDidChange() }
+            .store(in: &cancellables)
+        settings.$appOverrides.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.engine.optionalFeaturesDidChange() }
+            .store(in: &cancellables)
+        settings.$disabledDomains.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.engine.optionalFeaturesDidChange() }
+            .store(in: &cancellables)
+        settings.$isEnabled.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.engine.optionalFeaturesDidChange() }
+            .store(in: &cancellables)
+        NotificationCenter.default.addObserver(forName: .tabTypePrivacyChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.engine.optionalFeaturesDidChange() }
+        }
     }
 
     private func refreshInputMonitoring() {
@@ -115,6 +157,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         accessibilityTimer?.invalidate()
         accessibilityTimer = nil
         engine.stop()
+        SyncManager.shared.stop()
+        PersonalIndex.shared.stop()
+        WritingStore.shared.stopCollection()
         Task { @MainActor in
             await llamaModels.shutdown()
             NSApp.reply(toApplicationShouldTerminate: true)

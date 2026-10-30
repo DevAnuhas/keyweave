@@ -29,6 +29,22 @@ enum ContextReader {
         var windowTitle: String = ""
         /// The field's placeholder ("Message Priya", "Reply…"), when it has one.
         var placeholder: String = ""
+        /// Confirmed field text for learning, independent of prediction fallback.
+        var writingSnapshot: String? = nil
+    }
+
+    struct InputSelection: Equatable {
+        let input: String
+        let writingSnapshot: String?
+    }
+
+    static func selectInput(accessibilityBefore: String?, fallbackBuffer: String,
+                            inputChars: Int) -> InputSelection {
+        if let before = accessibilityBefore, !before.isEmpty {
+            let confirmed = String(before.suffix(inputChars))
+            return InputSelection(input: confirmed, writingSnapshot: confirmed)
+        }
+        return InputSelection(input: String(fallbackBuffer.suffix(inputChars)), writingSnapshot: nil)
     }
 
     /// - fallbackBuffer: keystroke buffer used when AX text isn't available.
@@ -50,12 +66,9 @@ enum ContextReader {
         let full = focused.flatMap { AccessibilityBridge.stringValue(of: $0) }
         let parts = full.map { AccessibilityBridge.split($0, caretUTF16: focused.flatMap(AccessibilityBridge.caretOffset)) }
 
-        var input = ""
-        if let before = parts?.before, !before.isEmpty {
-            input = String(before.suffix(inputChars))
-        } else {
-            input = String(fallbackBuffer.suffix(inputChars))
-        }
+        let selection = selectInput(accessibilityBefore: parts?.before,
+                                    fallbackBuffer: fallbackBuffer, inputChars: inputChars)
+        let input = selection.input
 
         // Long-form: if the field holds more text than the caret window shows,
         // the document's opening (title/intro) anchors what this is ABOUT.
@@ -77,7 +90,8 @@ enum ContextReader {
         return Result(dedupKey: dedupKey, input: input, afterCursor: afterCursor,
                       focused: focused, window: window,
                       hasInput: !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                      documentStart: documentStart, windowTitle: windowTitle, placeholder: placeholder)
+                      documentStart: documentStart, windowTitle: windowTitle, placeholder: placeholder,
+                      writingSnapshot: selection.writingSnapshot)
     }
 
     /// Frame of the window enclosing `element`, if resolvable.

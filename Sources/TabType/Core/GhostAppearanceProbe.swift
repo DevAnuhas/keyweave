@@ -21,30 +21,59 @@ final class GhostAppearanceProbe: ObservableObject {
     private var probing = false
     private let minInterval: TimeInterval = 1.0
 
-    private init() {}
+    private let appearanceEnabled: () -> Bool
+    private let permissionAllowed: () -> Bool
+    private var generation = UUID()
+    private var cachedTarget: WindowCaptureTarget?
+
+    init(appearanceEnabled: @escaping () -> Bool = { AppSettings.shared.useScreenshotAppearance },
+         permissionAllowed: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
+        self.appearanceEnabled = appearanceEnabled
+        self.permissionAllowed = permissionAllowed
+    }
+
+    func invalidate() {
+        generation = UUID()
+        cached = nil
+        cachedTarget = nil
+        lastProbe = .distantPast
+        probing = false
+    }
 
     /// The most recent probed appearance (may be nil until the first probe lands).
-    var current: Appearance? { cached }
+    var current: Appearance? { appearanceEnabled() ? cached : nil }
 
     /// Kick a probe of the caret line if stale. Non-blocking; updates `cached`.
     func refresh(caretRect: CGRect) {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return }
-        guard CGPreflightScreenCaptureAccess(), !probing,
-              Date().timeIntervalSince(lastProbe) > minInterval,
+        guard appearanceEnabled() else { return }
+        guard permissionAllowed(), let target = WindowCaptureTarget.current() else {
+            invalidate()
+            return
+        }
+        if cachedTarget != target { cached = nil }
+        guard !probing, Date().timeIntervalSince(lastProbe) > minInterval,
               caretRect.width.isFinite, caretRect.height > 1 else { return }
         probing = true
         lastProbe = Date()
+        let requestedGeneration = generation
 
         // Sample a strip to the LEFT of the caret (where existing text sits).
-        let h = min(max(caretRect.height, 10), 60)
-        let sample = CGRect(x: max(0, caretRect.minX - 220), y: caretRect.minY,
-                            width: 220, height: h)
+        let left = max(target.frame.minX, caretRect.minX - 220)
+        let right = min(target.frame.maxX, caretRect.maxX)
+        let h = min(max(caretRect.height, 10), 60, target.frame.maxY - caretRect.minY)
+        let sample = CGRect(x: left, y: caretRect.minY, width: right - left, height: h)
 
         Task.detached(priority: .utility) {
             let appearance = await GhostAppearanceProbe.sample(rect: sample)
             await MainActor.run {
+                guard self.generation == requestedGeneration else { return }
                 self.probing = false
-                if let appearance { self.cached = appearance }
+                guard self.appearanceEnabled(),
+                      WindowCaptureTarget.current() == target else { return }
+                if let appearance {
+                    self.cached = appearance
+                    self.cachedTarget = target
+                }
             }
         }
     }
@@ -57,7 +86,7 @@ final class GhostAppearanceProbe: ObservableObject {
     /// (no permission / capture failure) — caller decides the default.
     ///
     nonisolated static func hasTextPixels(in rect: CGRect) async -> Bool? {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
+        guard await MainActor.run(body: { AppSettings.shared.useScreenshotAppearance }) else { return nil }
         guard rect.width >= 8, rect.height >= 6 else {
             Log.shared.debug("occupancy: strip \(rect) too small — nil")
             return nil
@@ -93,7 +122,7 @@ final class GhostAppearanceProbe: ObservableObject {
     /// the (padded, app-dependent) AX line box. nil when the strip is empty or
     /// capture fails.
     nonisolated static func inkBand(in rect: CGRect) async -> InkBand? {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
+        guard await MainActor.run(body: { AppSettings.shared.useScreenshotAppearance }) else { return nil }
         guard rect.width >= 20, rect.height >= 8,
               CGPreflightScreenCaptureAccess(),
               let image = await capture(rect: rect),
@@ -158,22 +187,49 @@ final class GhostAppearanceProbe: ObservableObject {
         await captureScaled(rect: rect)?.image
     }
 
-    /// Screenshot of `rect` (top-left global points) at the display's real pixel
-    /// scale, with TabType's own windows excluded so the ghost never sees itself.
-    nonisolated static func captureScaled(rect: CGRect) async -> (image: CGImage, scale: Double)? {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
-        guard let content = await ShareableContentCache.shared.content() else { return nil }
-        guard let display = content.displays.first(where: { displayRectTopLeft($0).intersects(rect) })
-                ?? content.displays.first else { return nil }
-        let ownApps = content.applications.filter { $0.processID == ProcessInfo.processInfo.processIdentifier }
-        let filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
+    /// A consented strip from the exact focused window. The display filter
+    /// includes only that window, so another app can never enter the sample.
+    nonisolated static func captureScaled(
+        rect: CGRect,
+        consent: @escaping @MainActor @Sendable () -> Bool = { AppSettings.shared.useScreenshotAppearance },
+        currentTarget: @escaping @MainActor @Sendable () -> WindowCaptureTarget? = { WindowCaptureTarget.current() },
+        currentGeneration: @escaping @MainActor @Sendable () -> UUID = { GhostAppearanceProbe.shared.generation },
+        capture: (@Sendable (WindowCaptureTarget, CGRect) async -> (image: CGImage, scale: Double)?)? = nil
+    ) async -> (image: CGImage, scale: Double)? {
+        guard let request = await MainActor.run(body: { () -> (WindowCaptureTarget, UUID)? in
+            guard consent(), let target = currentTarget() else { return nil }
+            return (target, currentGeneration())
+        }) else { return nil }
+        let (target, generation) = request
+        guard target.contains(rect) else { return nil }
+        let isCurrent: @Sendable () async -> Bool = {
+            await MainActor.run { consent() && currentTarget() == target && currentGeneration() == generation }
+        }
+        let result: (image: CGImage, scale: Double)?
+        if let capture { result = await capture(target, rect) }
+        else { result = await captureWindowStrip(rect: rect, target: target, isCurrent: isCurrent) }
+        guard !Task.isCancelled,
+              await MainActor.run(body: { consent() && currentTarget() == target && currentGeneration() == generation }) else { return nil }
+        return result
+    }
+
+    nonisolated private static func captureWindowStrip(
+        rect: CGRect, target: WindowCaptureTarget, isCurrent: @Sendable () async -> Bool
+    ) async -> (image: CGImage, scale: Double)? {
+        guard CGPreflightScreenCaptureAccess(),
+              let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+        else { return nil }
+        let descriptors = content.windows.map { WindowCaptureTarget.Window(
+            id: $0.windowID, pid: $0.owningApplication?.processID ?? 0,
+            bundleId: $0.owningApplication?.bundleIdentifier ?? "", frame: $0.frame, onScreen: $0.isOnScreen) }
+        guard let selected = target.selectedWindowID(in: descriptors),
+              let window = content.windows.first(where: { $0.windowID == selected }),
+              let display = content.displays.first(where: { displayRectTopLeft($0).contains(rect.integral) }),
+              !Task.isCancelled, await isCurrent()
+        else { return nil }
+        let filter = SCContentFilter(display: display, including: [window])
         let scale = pixelScale(of: display)
         let config = SCStreamConfiguration()
-        // sourceRect is in points, top-left origin relative to the display.
-        // ScreenCaptureKit rounds a fractional source rect outward to whole points
-        // and then aspect-fits it into width×height, squeezing the content and
-        // leaving transparent columns. So capture the whole-point rect at exactly
-        // `scale`, then crop back to the requested rect.
         let local = CGRect(x: rect.minX - display.frame.minX,
                            y: rect.minY - displayRectTopLeft(display).minY,
                            width: rect.width, height: rect.height)
@@ -304,25 +360,5 @@ final class GhostAppearanceProbe: ObservableObject {
             textColor: NSColor(srgbRed: fg.0, green: fg.1, blue: fg.2, alpha: 1),
             backgroundColor: NSColor(srgbRed: bg.0, green: bg.1, blue: bg.2, alpha: 1),
             isDark: isDark)
-    }
-}
-
-/// `SCShareableContent` enumerates every window on screen — too slow to repeat for
-/// each probe. Displays and our own app rarely change, so a few seconds is fine.
-/// (A lock, not an actor: `SCShareableContent` isn't Sendable.)
-final class ShareableContentCache: @unchecked Sendable {
-    static let shared = ShareableContentCache()
-    private let lock = NSLock()
-    private var cached: (content: SCShareableContent, at: Date)?
-
-    func content() async -> SCShareableContent? {
-        guard AppSafetyPolicy.screenshotAppearanceEnabled else { return nil }
-        if let hit = lock.withLock({ cached.flatMap { Date().timeIntervalSince($0.at) < 5 ? $0.content : nil } }) {
-            return hit
-        }
-        guard let fresh = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        else { return nil }
-        lock.withLock { cached = (fresh, Date()) }
-        return fresh
     }
 }

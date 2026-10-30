@@ -75,7 +75,11 @@ final class PassiveStorageIsolationTests: XCTestCase {
         let login = LaunchAtLogin.SystemBoundary(
             isEnabled: { loginReads += 1; return true },
             setEnabled: { _ in loginWrites += 1 })
-        let cache = FieldFitCache(paths: paths, screenCaptureAllowed: { permissionReads += 1; return false })
+        let cache = FieldFitCache(paths: paths,
+                                  screenCaptureAllowed: { permissionReads += 1; return false },
+                                  appearanceEnabled: { false })
+        XCTAssertEqual(loginReads, 0)
+        XCTAssertEqual(loginWrites, 0)
         for _ in 0..<2 {
             _ = Log(directory: paths.logsDirectory)
             _ = Log(directory: home.appendingPathComponent("uncreated-log"))
@@ -84,16 +88,14 @@ final class PassiveStorageIsolationTests: XCTestCase {
             XCTAssertEqual(statistics.wordsCompleted, 0)
             XCTAssertNil(statistics.latencyPercentiles)
             XCTAssertEqual(EmojiUsageStore(defaults: defaults).recentCodes, ["synthetic-emoji"])
-            XCTAssertFalse(LaunchAtLogin.isEnabled(using: login))
+            XCTAssertTrue(LaunchAtLogin.isEnabled(using: login))
             XCTAssertNil(cache.cached(key: "synthetic"))
             let fit = await cache.fit(caret: CGRect(x: 100, y: 100, width: 1, height: 20), fieldFrame: nil,
                                       key: "synthetic", lineText: "Synthetic text only", verbose: true)
             XCTAssertNil(fit)
         }
-        LaunchAtLogin.set(true, using: login)
-        LaunchAtLogin.set(false, using: login)
         XCTAssertEqual(permissionReads, 0)
-        XCTAssertEqual(loginReads, 0)
+        XCTAssertEqual(loginReads, 2)
         XCTAssertEqual(loginWrites, 0)
         XCTAssertEqual(defaults.persistentDomain(forName: domain) as NSDictionary?, before)
         XCTAssertEqual(try Data(contentsOf: upstreamLogs.appendingPathComponent("tabtype.log")), oldLog)
@@ -103,55 +105,29 @@ final class PassiveStorageIsolationTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: paths.fitCapturesDirectory.path))
     }
 
-    func testSettingsNeverRestoreOrEnableGate0SensitiveServices() throws {
+    func testSettingsConstructionPreservesStoredPreferences() throws {
         let domain = "dev.anuhas.keyweave.test.settings.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         defer { defaults.removePersistentDomain(forName: domain) }
-        let restricted = ["useScreenContext", "useClipboardContext", "useScreenshotAppearance",
-                          "collectTypingHistory", "recordWithoutAccepts"]
-        for key in restricted { defaults.set(true, forKey: key) }
-        defaults.set(0.123, forKey: "temperature") // retired preference must not be migrated/deleted
+        defaults.set(0.123, forKey: "temperature") // Retired keys are not cleaned up implicitly.
         defaults.set("Synthetic author", forKey: "authorName")
         defaults.set(try JSONEncoder().encode(KeyBinding.escape), forKey: "acceptWordKey")
         let before = try XCTUnwrap(defaults.persistentDomain(forName: domain)) as NSDictionary
+
         for _ in 0..<2 {
             let settings = AppSettings(defaults: defaults)
             XCTAssertEqual(settings.acceptWordKey, .escape)
-            XCTAssertFalse(settings.useScreenContext)
-            XCTAssertFalse(settings.useClipboardContext)
-            XCTAssertFalse(settings.useScreenshotAppearance)
-            XCTAssertFalse(settings.collectTypingHistory)
-            XCTAssertFalse(settings.recordWithoutAccepts)
+            XCTAssertEqual(settings.authorName, "Synthetic author")
         }
         XCTAssertEqual(defaults.persistentDomain(forName: domain) as NSDictionary?, before)
-
-        let settings = AppSettings(defaults: defaults)
-        settings.useScreenContext = true
-        settings.useClipboardContext = true
-        settings.useScreenshotAppearance = true
-        settings.collectTypingHistory = true
-        settings.recordWithoutAccepts = true
-        var remote = settings.syncSnapshot
-        remote.useScreenContext = true
-        remote.useClipboardContext = true
-        remote.useScreenshotAppearance = true
-        remote.collectTypingHistory = true
-        remote.recordWithoutAccepts = true
-        settings.apply(remote)
-        XCTAssertFalse(settings.useScreenContext)
-        XCTAssertFalse(settings.useClipboardContext)
-        XCTAssertFalse(settings.useScreenshotAppearance)
-        XCTAssertFalse(settings.collectTypingHistory)
-        XCTAssertFalse(settings.recordWithoutAccepts)
-        for key in restricted { XCTAssertFalse(defaults.bool(forKey: key)) }
-        XCTAssertEqual(defaults.double(forKey: "temperature"), 0.123)
     }
 
     func testSyncSettingsGettersAndDisabledLifecycleNeverReachSystemBoundaries() throws {
         let domain = "dev.anuhas.keyweave.test.sync.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         defer { defaults.removePersistentDomain(forName: domain) }
-        defaults.set(true, forKey: "syncEnabled")
+        defaults.set(false, forKey: "syncEnabled")
+        defaults.set("Synthetic author", forKey: "authorName")
         defaults.set("synthetic preference sentinel", forKey: "sentinel")
         let before = try XCTUnwrap(defaults.persistentDomain(forName: domain)) as NSDictionary
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("Keyweave-Gate0-sync-\(UUID())")
@@ -172,11 +148,9 @@ final class PassiveStorageIsolationTests: XCTestCase {
             XCTAssertEqual(manager.status, "")
             XCTAssertEqual(manager.otherMacs, 0)
         }
-        manager.enabled = true
         manager.start()
         manager.syncNow()
         manager.setPassphrase("synthetic passphrase, never a real credential")
-        manager.enabled = false
         manager.stop()
         XCTAssertEqual(keyReads, 0)
         XCTAssertEqual(keyWrites, 0)
@@ -202,7 +176,7 @@ final class PassiveStorageIsolationTests: XCTestCase {
             for (name, data) in fixtures { try data.write(to: directory.appendingPathComponent(name)) }
         }
 
-        let store = WritingStore(directory: current)
+        let store = WritingStore(directory: current, collectionEnabled: { false })
         var changes = 0
         store.onChange = { changes += 1 }
         store.onSyncNeeded = { changes += 1 }
@@ -213,10 +187,9 @@ final class PassiveStorageIsolationTests: XCTestCase {
             XCTAssertEqual(store.characterCount, 0)
         }
         store.start()
-        store.record("Synthetic writing that must never enter a Gate0 store.", bundleId: "test.synthetic", fieldKey: nil, kind: .message)
+        store.record("Synthetic writing that must never enter an opted-out store.", bundleId: "test.synthetic", fieldKey: nil, kind: .message)
         store.merge([.init(key: "synthetic", bundleId: "test.synthetic", text: "Synthetic remote writing.", updated: .distantPast)])
         store.importPendingFile()
-        store.eraseAll()
         XCTAssertEqual(changes, 0)
         XCTAssertEqual(store.allDocuments, [])
         for directory in [upstream, current] {
@@ -224,7 +197,7 @@ final class PassiveStorageIsolationTests: XCTestCase {
             for (name, data) in fixtures { XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent(name)), data) }
         }
         let absent = home.appendingPathComponent("uncreated-writing")
-        _ = WritingStore(directory: absent).texts
+        _ = WritingStore(directory: absent, collectionEnabled: { false }).texts
         XCTAssertFalse(FileManager.default.fileExists(atPath: absent.path))
     }
 }

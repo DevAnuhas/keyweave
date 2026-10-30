@@ -26,6 +26,7 @@ final class ScreenContextProvider: ObservableObject {
         /// channels/threads; the title tells them apart, so a previous
         /// conversation never passes for the current one.
         var windowTitle: String?
+        let target: WindowCaptureTarget
     }
 
     private(set) var history: [Entry] = []
@@ -65,21 +66,42 @@ final class ScreenContextProvider: ObservableObject {
     }
 
     private let platform: PlatformOperations
+    private let contextEnabled: () -> Bool
+    private let appearanceEnabled: () -> Bool
+    private let focusedTarget: () -> WindowCaptureTarget?
+    private var captureGeneration = UUID()
+    private var captureTask: Task<Void, Never>?
 
-    init(platform: PlatformOperations = PlatformOperations()) {
+    init(platform: PlatformOperations = PlatformOperations(),
+         contextEnabled: @escaping () -> Bool = { AppSettings.shared.useScreenContext },
+         appearanceEnabled: @escaping () -> Bool = { AppSettings.shared.useScreenshotAppearance },
+         focusedTarget: @escaping () -> WindowCaptureTarget? = { WindowCaptureTarget.current(forContext: true) }) {
         self.platform = platform
+        self.contextEnabled = contextEnabled
+        self.appearanceEnabled = appearanceEnabled
+        self.focusedTarget = focusedTarget
+    }
+
+    /// Opt-out and focus changes discard both cached and in-flight context.
+    func invalidate() {
+        captureGeneration = UUID()
+        captureTask?.cancel()
+        captureTask = nil
+        capturing = false
+        history.removeAll()
+        lastCaptureStarted = .distantPast
     }
 
     // MARK: Permission
 
     func hasPermission() -> Bool {
-        guard AppSafetyPolicy.screenContextEnabled else { return false }
+        guard contextEnabled() || appearanceEnabled() else { return false }
         return platform.preflightPermission()
     }
 
     @discardableResult
     func requestPermission() -> Bool {
-        guard AppSafetyPolicy.screenContextEnabled else { return false }
+        guard contextEnabled() || appearanceEnabled() else { return false }
         return platform.requestPermission()
     }
 
@@ -90,7 +112,7 @@ final class ScreenContextProvider: ObservableObject {
     /// own text is passed along so the OCR can strip it — the prompt already carries
     /// that text verbatim via accessibility, so re-OCR'ing it only adds noise.
     func refreshIfStale() {
-        guard AppSafetyPolicy.screenContextEnabled, AppSettings.shared.useScreenContext else { return }
+        guard contextEnabled(), let target = focusedTarget() else { return }
         let screenRecordingAllowed = hasPermission()
         if !screenRecordingAllowed {
             if !warnedNoPermission {
@@ -104,15 +126,10 @@ final class ScreenContextProvider: ObservableObject {
         // capture of this window: clicking into a chat and typing straight away
         // would otherwise leave the whole message without its conversation.
         if Date().timeIntervalSince(lastEditAt) <= 1.0 {
-            let bid = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
-            let host = AccessibilityBridge.frontmostURLHost()
-            let title = Self.stableTitle(AccessibilityBridge.focusedElement()
-                .flatMap { ContextReader.windowOf($0) }
-                .flatMap { AccessibilityBridge.stringAttribute(kAXTitleAttribute as String, of: $0) })
             // Only a FRESH capture counts — an expired one is discarded by
             // `contextText`, so treating it as known left the prompt empty.
             let known = history.contains {
-                $0.bundleId == bid && $0.host == host && $0.windowTitle == title
+                $0.target == target
                     && Date().timeIntervalSince($0.time) < 20
             }
             guard !known else { return }
@@ -151,8 +168,17 @@ final class ScreenContextProvider: ObservableObject {
         // stop masquerading as the conversation.
         let columnFrame = focused.flatMap { AccessibilityBridge.elementFrame(of: $0) }
         let ocrField = columnFrame
+        guard frontPid == target.pid, frontBid == target.bundleId,
+              windowFrame == target.frame, frontHost == target.host,
+              Self.stableTitle(frontTitle) == target.title,
+              focused.map({ CFHash($0) }) == target.fieldID, focusedTarget() == target else {
+            capturing = false
+            lastCaptureStarted = .distantPast
+            return
+        }
 
-        Task.detached(priority: .utility) {
+        let generation = captureGeneration
+        captureTask = Task.detached(priority: .utility) {
             let reading = await ContextSourceReader.read(
                 screenRecordingAllowed: screenRecordingAllowed,
                 accessibilityEligible: windowBox != nil,
@@ -162,7 +188,9 @@ final class ScreenContextProvider: ObservableObject {
                         windowFrame: windowFrame, fieldFrame: ocrField)
                 },
                 accessibility: {
-                    guard let windowBox,
+                    guard !Task.isCancelled,
+                          await MainActor.run(body: { self.contextEnabled() && self.focusedTarget() == target }),
+                          let windowBox,
                           let transcript = TranscriptExtractor.extract(
                             windowElement: windowBox.element,
                             excludingSubtreeOf: focusedBox?.element,
@@ -170,10 +198,13 @@ final class ScreenContextProvider: ObservableObject {
                     return (frontName, frontBid, transcript)
                 })
             await MainActor.run {
+                guard self.captureGeneration == generation else { return }
                 self.capturing = false
+                guard !Task.isCancelled, self.contextEnabled(),
+                      self.focusedTarget() == target else { return }
                 if let reading {
                     self.append(app: reading.app, bundleId: reading.bundleId, text: reading.text,
-                                windowTitle: frontTitle, host: frontHost, source: reading.source.rawValue)
+                                windowTitle: frontTitle, host: frontHost, target: target, source: reading.source.rawValue)
                 } else {
                     Log.shared.debug("screen memory: no usable OCR or accessible conversation text this round")
                 }
@@ -182,7 +213,8 @@ final class ScreenContextProvider: ObservableObject {
     }
 
     private func append(app: String, bundleId: String, text: String,
-                        windowTitle: String? = nil, host: String? = nil, source: String = "ocr") {
+                        windowTitle: String? = nil, host: String? = nil,
+                        target: WindowCaptureTarget, source: String = "ocr") {
         // Normalize away chat-UI jitter (timestamps, presence, "(edited)") BEFORE
         // storing — the stored snapshot must stay byte-identical between real
         // messages or every capture invalidates the prompt's KV prefix.
@@ -192,13 +224,13 @@ final class ScreenContextProvider: ObservableObject {
         // tail; scroll/timestamp jitter doesn't. Same tail + similar length ⇒
         // keep the EXISTING snapshot so the prompt bytes don't move.
         if let last = history.last(where: {
-            $0.bundleId == bundleId && $0.host == host && $0.windowTitle == Self.stableTitle(windowTitle)
+            $0.target == target
         }),
            !TranscriptNormalizer.isMeaningfulChange(old: last.text, new: normalized) {
             return
         }
         history.append(Entry(time: Date(), app: app, bundleId: bundleId,
-                             text: normalized, host: host, windowTitle: Self.stableTitle(windowTitle)))
+                             text: normalized, host: host, windowTitle: Self.stableTitle(windowTitle), target: target))
 
         let cutoff = Date().addingTimeInterval(-maxAge)
         history.removeAll { $0.time < cutoff }
@@ -224,22 +256,25 @@ final class ScreenContextProvider: ObservableObject {
     }
 
     func contextText(for bundleId: String?, cap: Int, host: String? = nil) -> String {
-        guard AppSafetyPolicy.screenContextEnabled, AppSettings.shared.useScreenContext else { return "" }
+        guard contextEnabled(), !history.isEmpty else { return "" }
         return contextText(for: bundleId, cap: cap, host: host, windowTitle: platform.focusedWindowTitle())
     }
 
     func contextText(for bundleId: String?, cap: Int, host: String? = nil,
                      windowTitle: String?) -> String {
-        guard AppSafetyPolicy.screenContextEnabled, AppSettings.shared.useScreenContext else { return "" }
-        guard !history.isEmpty, let bundleId else { return "" }
+        guard contextEnabled() else { return "" }
+        guard !history.isEmpty, let bundleId, let target = focusedTarget(),
+              target.bundleId == bundleId, target.host == host,
+              target.title == Self.stableTitle(windowTitle) else { return "" }
         let cutoff = Date().addingTimeInterval(-maxAge)
         // Browsers share one bundle id across tabs — when a host is known, only
         // same-host entries count as CURRENT context (a previous site's text is
         // offered separately as previous-app background, never as current).
         let matching = history.filter {
             $0.bundleId == bundleId && $0.time >= cutoff
-                && (host == nil || $0.host == nil || $0.host == host)
-                && (windowTitle == nil || $0.windowTitle == nil || $0.windowTitle == Self.stableTitle(windowTitle))
+                && $0.target == target
+                && $0.host == host
+                && $0.windowTitle == Self.stableTitle(windowTitle)
         }
         Log.shared.debug("screen context requested for bid=\(bundleId)\(host.map { " host=\($0)" } ?? ""), found \(matching.count) fresh entries out of \(history.count) total")
         guard var text = matching.last?.text else { return "" }
@@ -250,7 +285,7 @@ final class ScreenContextProvider: ObservableObject {
     /// One-shot diagnostic: capture the frontmost window, OCR it, and log the result
     /// at info level so we can confirm the capture+OCR pipeline works on this machine.
     func selfTest() {
-        guard AppSafetyPolicy.screenContextEnabled, AppSettings.shared.useScreenContext else { return }
+        guard contextEnabled() else { return }
         guard hasPermission() else {
             Log.shared.info("screen self-test: no Screen Recording permission")
             return
@@ -269,7 +304,7 @@ final class ScreenContextProvider: ObservableObject {
     // MARK: Capture + OCR implementation
 
     /// Apps whose windows are UI chrome, not content — never OCR these.
-    nonisolated private static let systemBundleIDs: Set<String> = [
+    nonisolated fileprivate static let systemBundleIDs: Set<String> = [
         "com.apple.dock", "com.apple.controlcenter", "com.apple.notificationcenterui",
         "com.apple.WindowManager", "com.apple.systemuiserver", "com.apple.spotlight",
         "com.apple.wallpaper", ProductIdentity.bundleIdentifier,
@@ -281,19 +316,37 @@ final class ScreenContextProvider: ObservableObject {
     nonisolated static func captureFocusedWindow(
         pid: pid_t?, fieldText: String, cropMode: AppSettings.ScreenCropMode, caretRect: CGRect?, windowFrame: CGRect?,
         fieldFrame: CGRect? = nil,
-        capture: (@Sendable () async -> (String, String, String)?)? = nil
+        capture: (@Sendable () async -> (String, String, String)?)? = nil,
+        consent: @escaping @MainActor @Sendable () -> Bool = { AppSettings.shared.useScreenContext },
+        currentTarget: @escaping @MainActor @Sendable () -> WindowCaptureTarget? = { WindowCaptureTarget.current(forContext: true) },
+        currentGeneration: @escaping @MainActor @Sendable () -> UUID = { ScreenContextProvider.shared.captureGeneration }
     ) async -> (String, String, String)? {
-        guard AppSafetyPolicy.screenContextEnabled else { return nil }
-        guard await MainActor.run(body: { AppSettings.shared.useScreenContext }) else { return nil }
-        if let capture { return await capture() }
-        return await captureFocusedWindowImpl(pid: pid, fieldText: fieldText, cropMode: cropMode,
-                                             caretRect: caretRect, windowFrame: windowFrame, fieldFrame: fieldFrame)
+        guard let request = await MainActor.run(body: { () -> (WindowCaptureTarget, UUID)? in
+            guard consent(), let target = currentTarget() else { return nil }
+            return (target, currentGeneration())
+        }) else { return nil }
+        let (target, generation) = request
+        guard target.pid == pid, target.frame == windowFrame else { return nil }
+        let isCurrent: @Sendable () async -> Bool = {
+            await MainActor.run { consent() && currentTarget() == target && currentGeneration() == generation }
+        }
+        let result: (String, String, String)?
+        if let capture { result = await capture() }
+        else {
+            result = await captureFocusedWindowImpl(target: target, fieldText: fieldText, cropMode: cropMode,
+                                                   caretRect: caretRect, fieldFrame: fieldFrame, isCurrent: isCurrent)
+        }
+        guard !Task.isCancelled,
+              await MainActor.run(body: { consent() && currentTarget() == target && currentGeneration() == generation }),
+              result?.1 == target.bundleId else { return nil }
+        return result
     }
 
     nonisolated private static func captureFocusedWindowImpl(
-        pid: pid_t?, fieldText: String, cropMode: AppSettings.ScreenCropMode, caretRect: CGRect?, windowFrame: CGRect?,
-        fieldFrame: CGRect?
+        target: WindowCaptureTarget, fieldText: String, cropMode: AppSettings.ScreenCropMode, caretRect: CGRect?,
+        fieldFrame: CGRect?, isCurrent: @Sendable () async -> Bool
     ) async -> (String, String, String)? {
+        guard CGPreflightScreenCaptureAccess(), !Task.isCancelled, await isCurrent() else { return nil }
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(
                 true, onScreenWindowsOnly: true)
@@ -305,30 +358,12 @@ final class ScreenContextProvider: ObservableObject {
                 return true
             }
             
-            // First, try to exactly match the window frame provided by the Accessibility API
-            var window: SCWindow?
-            if let pid = pid, let frame = windowFrame {
-                // SCWindow frames and AXWindow frames might have slight differences depending on borders/shadows.
-                // We check that the centers are within 100 points, which is robust against shadow insets.
-                window = candidates.first { w in
-                    w.owningApplication?.processID == pid &&
-                    abs(w.frame.midX - frame.midX) < 100 &&
-                    abs(w.frame.midY - frame.midY) < 100
-                }
-            }
-            
-            // Fallback: The frontmost app's largest window; else the largest overall.
-            if window == nil {
-                let byArea: (SCWindow, SCWindow) -> Bool = {
-                    $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height
-                }
-                if let pid, let w = candidates.filter({ $0.owningApplication?.processID == pid }).max(by: byArea) {
-                    window = w
-                } else {
-                    window = candidates.max(by: byArea)
-                }
-            }
-            guard let window else { return nil }
+            let descriptors = candidates.map { WindowCaptureTarget.Window(
+                id: $0.windowID, pid: $0.owningApplication?.processID ?? 0,
+                bundleId: $0.owningApplication?.bundleIdentifier ?? "", frame: $0.frame, onScreen: $0.isOnScreen) }
+            guard let selected = target.selectedWindowID(in: descriptors),
+                  let window = candidates.first(where: { $0.windowID == selected }),
+                  !Task.isCancelled, await isCurrent() else { return nil }
 
             let config = SCStreamConfiguration()
             let scale = 2
@@ -338,6 +373,7 @@ final class ScreenContextProvider: ObservableObject {
             let filter = SCContentFilter(desktopIndependentWindow: window)
             guard var image = try? await SCScreenshotManager.captureImage(
                 contentFilter: filter, configuration: config) else { return nil }
+            guard !Task.isCancelled, await isCurrent() else { return nil }
             
             // Caret cropping: keep only the vertical band around the caret's line.
             // Crop the height ONLY — text flows horizontally, so a horizontal pixel
@@ -456,5 +492,31 @@ final class ScreenContextProvider: ObservableObject {
         }
         let text = OCRCleaner.clean(raw)
         return text.isEmpty ? nil : text
+    }
+}
+
+extension WindowCaptureTarget {
+    /// Evaluated only after the caller's context/appearance opt-in guard.
+    @MainActor
+    static func current(forContext: Bool = false) -> WindowCaptureTarget? {
+        guard AppSettings.shared.isEnabled,
+              let app = NSWorkspace.shared.frontmostApplication,
+              let bundleId = app.bundleIdentifier,
+              !ScreenContextProvider.systemBundleIDs.contains(bundleId),
+              AppPolicyStore.policy(forBundleId: bundleId).isEnabled else { return nil }
+        let host = AccessibilityBridge.frontmostURLHost()
+        guard host.map({ host in
+            !AppSettings.shared.disabledDomains.contains { host == $0 || host.hasSuffix("." + $0) }
+        }) ?? true else { return nil }
+        let policy = AppPolicyStore.policy(forBundleId: bundleId, host: host)
+        guard policy.isEnabled, !forContext || policy.includesScreenContext,
+              let focused = AccessibilityBridge.focusedElement(),
+              !AccessibilityBridge.isSecureField(focused),
+              !AccessibilityBridge.isCredentialField(focused),
+              let frame = AccessibilityBridge.focusedWindowFrame() else { return nil }
+        return WindowCaptureTarget(pid: app.processIdentifier, bundleId: bundleId, frame: frame,
+                                   title: ScreenContextProvider.stableTitle(AccessibilityBridge.focusedWindowTitle()),
+                                   host: host, fieldID: CFHash(focused),
+                                   consentRevision: AppSettings.shared.privacyRevision)
     }
 }
