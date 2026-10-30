@@ -40,8 +40,8 @@ final class ScreenContextProvider: ObservableObject {
                                                    // conversations stay relevant a while
                                                    // and captures don't land every minute
 
-    /// Logged once so a missing permission (which silently zeroes out screen context
-    /// forever otherwise) is actually diagnosable instead of invisible.
+    /// Explain once that missing Screen Recording disables OCR, while eligible
+    /// accessible conversation text remains available.
     private var warnedNoPermission = false
 
     /// Fired when a capture lands with genuinely NEW content (dedup'd against the
@@ -91,12 +91,12 @@ final class ScreenContextProvider: ObservableObject {
     /// that text verbatim via accessibility, so re-OCR'ing it only adds noise.
     func refreshIfStale() {
         guard AppSafetyPolicy.screenContextEnabled, AppSettings.shared.useScreenContext else { return }
-        guard hasPermission() else {
+        let screenRecordingAllowed = hasPermission()
+        if !screenRecordingAllowed {
             if !warnedNoPermission {
                 warnedNoPermission = true
-                Log.shared.info("screen memory: no Screen Recording permission — context will stay empty until granted (Settings ▸ Personalization, or System Settings ▸ Privacy & Security ▸ Screen Recording)")
+                Log.shared.info("screen memory: no Screen Recording permission — OCR is off; eligible accessible conversation text can still provide context")
             }
-            return
         }
         guard !capturing, Date().timeIntervalSince(lastCaptureStarted) > minInterval else { return }
         // Mid-burst freeze: while the user is actively typing, snapshots jitter
@@ -132,8 +132,8 @@ final class ScreenContextProvider: ObservableObject {
         let caretRect = focused.flatMap { AccessibilityBridge.caretRect(of: $0) }
         let windowFrame = AccessibilityBridge.focusedWindowFrame()
         let cropMode = AppSettings.ScreenCropMode.caretCropped
-        // Chat apps (host-aware, so web chats count too) keep the accessibility
-        // transcript as a fallback for when the screen read produces nothing.
+        // Eligible chat apps (including web chats) use accessible conversation
+        // text when OCR is unavailable or produces nothing usable.
         let frontHost = AccessibilityBridge.frontmostURLHost()
         let frontTitle = focused.flatMap { ContextReader.windowOf($0) }
             .flatMap { AccessibilityBridge.stringAttribute(kAXTitleAttribute as String, of: $0) }
@@ -153,36 +153,30 @@ final class ScreenContextProvider: ObservableObject {
         let ocrField = columnFrame
 
         Task.detached(priority: .utility) {
-            // Like Cotypist, every app — chats included — reads what's on screen
-            // above the input field. The accessibility transcript is only the
-            // fallback when that produces nothing.
-            let capture = await ScreenContextProvider.captureFocusedWindow(
-                pid: frontPid, fieldText: fieldText, cropMode: cropMode, caretRect: caretRect,
-                windowFrame: windowFrame, fieldFrame: ocrField)
-            if let (app, bid, text) = capture, text.count >= 12 {
-                await MainActor.run {
-                    self.capturing = false
-                    self.append(app: app, bundleId: bid, text: text, windowTitle: frontTitle, host: frontHost)
-                }
-                return
-            }
-            if let windowBox,
-               let transcript = TranscriptExtractor.extract(
-                    windowElement: windowBox.element,
-                    excludingSubtreeOf: focusedBox?.element,
-                    columnFrame: columnFrame, budget: transcriptBudget),
-               transcript.count >= 80 {
-                await MainActor.run {
-                    self.capturing = false
-                    self.append(app: frontName, bundleId: frontBid, text: transcript,
-                                windowTitle: frontTitle,
-                                host: frontHost, source: "ax transcript")
-                }
-                return
-            }
+            let reading = await ContextSourceReader.read(
+                screenRecordingAllowed: screenRecordingAllowed,
+                accessibilityEligible: windowBox != nil,
+                ocr: {
+                    await ScreenContextProvider.captureFocusedWindow(
+                        pid: frontPid, fieldText: fieldText, cropMode: cropMode, caretRect: caretRect,
+                        windowFrame: windowFrame, fieldFrame: ocrField)
+                },
+                accessibility: {
+                    guard let windowBox,
+                          let transcript = TranscriptExtractor.extract(
+                            windowElement: windowBox.element,
+                            excludingSubtreeOf: focusedBox?.element,
+                            columnFrame: columnFrame, budget: transcriptBudget) else { return nil }
+                    return (frontName, frontBid, transcript)
+                })
             await MainActor.run {
                 self.capturing = false
-                Log.shared.debug("screen memory: capture produced no usable text this round")
+                if let reading {
+                    self.append(app: reading.app, bundleId: reading.bundleId, text: reading.text,
+                                windowTitle: frontTitle, host: frontHost, source: reading.source.rawValue)
+                } else {
+                    Log.shared.debug("screen memory: no usable OCR or accessible conversation text this round")
+                }
             }
         }
     }

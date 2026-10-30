@@ -1,6 +1,6 @@
 # Gate 0 isolation
 
-Status: implemented for review; unmerged. Scope is Gate 0.1–0.4 only. Gate 1+, feature parity work, merges, releases, paid services and Cotypist decompilation remain unauthorized. Upstream MIT attribution and internal Swift module/target names remain intact.
+Status: merged through [PR #3](https://github.com/DevAnuhas/keyweave/pull/3), [#4](https://github.com/DevAnuhas/keyweave/pull/4), [#5](https://github.com/DevAnuhas/keyweave/pull/5) and [#6](https://github.com/DevAnuhas/keyweave/pull/6) on 2026-10-29. The validated Gate 0 tree at `710d35fe649a39947f4911aa3f7d8be309c180c5` is byte-identical to merged main `9ef5dd2c02c57435f5653e69c6b658cc6a5b832d`. This report records Gate 0.1–0.4; follow-on [AX-context correctness work](ax-context-fallback.md) has its own scope and evidence. Upstream MIT attribution and internal Swift module/target names remain intact. No release, paid service or Cotypist decompilation is part of this work.
 
 ## Implemented boundary
 

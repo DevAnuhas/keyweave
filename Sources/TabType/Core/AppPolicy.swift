@@ -117,7 +117,7 @@ extension AppPolicy {
         switch profile {
         case .chat:
             lines.append(transcriptViaAX
-                ? "Reads the visible conversation via the accessibility tree (no screenshots needed)."
+                ? "Uses screen text when permitted, with conversation text from the accessibility tree as a fallback that needs no Screen Recording."
                 : "Reads nearby on-screen text for conversation context.")
         case .document:
             lines.append("Treats your document as the context — reads a large window around the cursor plus the document's opening lines.")
