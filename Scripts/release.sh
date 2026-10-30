@@ -18,8 +18,8 @@ fi
 [[ "${DEVELOPMENT_TEAM:-}" =~ ^[A-Z0-9]{10}$ ]] || fail 'Release requires DEVELOPMENT_TEAM.'
 [ -n "${KEYCHAIN_PROFILE:-}" ] || fail 'Release requires an existing KEYCHAIN_PROFILE; never pass credentials.'
 RELEASE=1 CONFIG=Release "$ROOT/Scripts/build.sh" app
-"$ROOT/Scripts/notarize.sh" app "$ROOT/dist/KeyWeaver.app"
+"$ROOT/Scripts/notarize.sh" app "$ROOT/dist/KeyWeave.app"
 "$ROOT/Scripts/package.sh"
-version="$(plutil -extract CFBundleShortVersionString raw -o - "$ROOT/dist/KeyWeaver.app/Contents/Info.plist")"
-"$ROOT/Scripts/notarize.sh" dmg "$ROOT/dist/KeyWeaver-$version-arm64.dmg"
+version="$(plutil -extract CFBundleShortVersionString raw -o - "$ROOT/dist/KeyWeave.app/Contents/Info.plist")"
+"$ROOT/Scripts/notarize.sh" dmg "$ROOT/dist/KeyWeave-$version-arm64.dmg"
 "$ROOT/Scripts/package.sh" --verify

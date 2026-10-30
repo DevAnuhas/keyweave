@@ -1,6 +1,6 @@
-# Working in KeyWeaver
+# Working in KeyWeave
 
-KeyWeaver is a public fork of TabType with isolated Keyweave storage namespaces. Preserve the upstream MIT notice and history. Product direction and current status live in [CONTEXT.md](CONTEXT.md); the active outcome is [docs/MILESTONE.md](docs/MILESTONE.md).
+KeyWeave is a public fork of TabType with isolated storage namespaces. Preserve the upstream MIT notice and history. Product direction and current status live in [CONTEXT.md](CONTEXT.md); the active outcome is [docs/MILESTONE.md](docs/MILESTONE.md).
 
 ## Invariants
 

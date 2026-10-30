@@ -1,22 +1,25 @@
-<p align="center"><img src="Resources/Branding/KeyWeaverIcon.png" alt="KeyWeaver app icon" width="160"></p>
+<p align="center"><img src="Resources/Branding/KeyWeaveIcon.png" alt="KeyWeave app icon" width="160"></p>
 
-# KeyWeaver
+# KeyWeave
 
-An open-source, on-device macOS writing assistant, built from [TabType](https://github.com/nilava/TabType). The application code is MIT-licensed, with upstream attribution preserved. Bundled runtime, fonts, emoji and dictionary data retain their own included notices and licenses.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-3b82f6" alt="MIT License"></a>
+  <a href="https://github.com/DevAnuhas/keyweave/releases/latest"><img src="https://img.shields.io/github/v/release/DevAnuhas/keyweave?color=a99bff" alt="Latest release"></a>
+  <a href="https://github.com/DevAnuhas/keyweave/releases"><img src="https://img.shields.io/github/downloads/DevAnuhas/keyweave/total?color=5b6de6" alt="Release downloads"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/macOS-14%2B-20232d?logo=apple&amp;logoColor=white" alt="Requires macOS 14 or later"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Architecture-Apple%20Silicon-5b6de6" alt="Apple Silicon"></a>
+  <a href="docs/runbooks/releasing.md"><img src="https://img.shields.io/badge/Distribution-Signed%20%26%20Notarized-20a77a" alt="Developer ID signed and Apple notarized"></a>
+</p>
 
-**KeyWeaver 2.2.1 continues the TabType 2.1.0 version line.** It fixes a preferences-initialization crash in the ordinary 2.2.0 installed launch. Core on-device autocomplete uses KeyWeaver's isolated namespaces: opening the app shows Setup, reopening returns to Settings, and input monitoring starts after Accessibility permission is granted. A selected model already installed for KeyWeaver loads at startup. Missing models require an explicit Download action; startup does not download or resume transfers.
+An open-source, on-device macOS writing assistant built from [TabType](https://github.com/nilava/TabType). Application code is MIT-licensed; bundled runtime and data retain their own [notices](Sources/TabType/Resources/ThirdPartyNotices/README.md).
 
-[Download the latest release](https://github.com/DevAnuhas/keyweave/releases/latest) · [2.2.1 launch-fix verification](docs/implementation/keyweaver-2.2.1.md) · [Release checks and packaging](docs/runbooks/releasing.md)
+[Download](https://github.com/DevAnuhas/keyweave/releases/latest) · [Project status](CONTEXT.md) · [Release instructions](docs/runbooks/releasing.md)
 
-Requires Apple Silicon and macOS 14 or later. Download the arm64 DMG or ZIP, check `SHA256SUMS.txt`, drag `KeyWeaver.app` into Applications and open it. In Setup, grant KeyWeaver its own Accessibility permission and choose/download a local model. Suggestions require the input monitor to be active and the model to be ready. Model files are not bundled; existing TabType/Cotypist stores and models are never automatically imported or migrated.
+## Install
 
-Screen/clipboard context, writing memory, sync, login registration and automatic updates remain disabled while their consent and compatibility work is completed. Screen Recording is not required for basic completion in the focused text field. The withdrawn `0.1.0` isolation build is [historical evidence](docs/implementation/keyweaver-preview.md), not the current app. Cotypist feature parity and broad host compatibility remain unverified.
+Requires Apple Silicon and macOS 14 or later. Drag `KeyWeave.app` into Applications, open Setup, grant its own Accessibility permission and choose/download a local model. Models are not bundled; TabType/Cotypist data and permissions are not migrated.
 
-## Identity and artwork
-
-KeyWeaver uses `dev.anuhas.keyweave`, with its own preferences, storage, caches, Keychain service and cloud namespace. The stable internal storage folders retain the earlier Keyweave spelling. Internal Swift targets remain `TabType`/`TabTypeKit`.
-
-The new app icon, matching logo mark and template menu-bar image were generated for KeyWeaver using Cotypist's public icon as visual inspiration. The final artwork and exact generation prompts are in [Resources/Branding](Resources/Branding/README.md). No Cotypist asset is distributed in this repository.
+Screen/clipboard context, screenshot appearance capture, writing memory, sync, login registration and automatic updates remain disabled. Complete Cotypist Pro/Labs parity is unfinished.
 
 ## Develop
 
@@ -26,13 +29,13 @@ Scripts/generate-brand-assets.sh
 Scripts/build.sh app
 ```
 
-The native test runner needs the pinned llama XCFramework already cached. First-time dependency resolution downloads a binary artifact; provision that separately. `build.sh` produces a local development bundle by default. A distribution build requires an explicit Developer ID identity and team, followed by successful notarization/stapling; see the [release runbook](docs/runbooks/releasing.md).
+The pinned llama XCFramework must already be cached before native tests. Development builds are separate from signed/notarized distribution builds; see the [release instructions](docs/runbooks/releasing.md).
 
-Start with [CONTEXT.md](CONTEXT.md), [working rules](AGENTS.md), the [documentation index](docs/README.md), and the [research coverage](docs/research/README.md). Inherited feature implementations remain in place; they are not evidence of enabled or verified feature parity.
+Start with [CONTEXT.md](CONTEXT.md), [working rules](AGENTS.md) and the [documentation index](docs/README.md). Internal modules remain `TabType`/`TabTypeKit`; the isolated `dev.anuhas.keyweave` namespaces stay stable.
 
 ## Inherited upstream README
 
-The original documentation below is retained as a reference and attribution. Its product promises, author statements, screenshots, install/update links and signing instructions describe upstream TabType, not a tested Keyweave release. Fork-specific guidance above takes precedence.
+The following documentation describes upstream TabType. Its feature promises and install/update instructions do not describe the current KeyWeave release; fork guidance above takes precedence.
 
 <div align="center">
 

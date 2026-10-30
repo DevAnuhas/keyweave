@@ -1,5 +1,5 @@
 #!/bin/bash
-# Internal Swift targets retain their upstream names. Public bundles are KeyWeaver.
+# Internal Swift targets retain their upstream names. Public bundles are KeyWeave.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -61,8 +61,8 @@ xcrun xcodebuild -scheme TabType -configuration "$CONFIG" \
     -skipPackagePluginValidation build
 [ ! -L "$ROOT/dist" ] || fail 'Refusing a symlink at dist.'
 mkdir -p "$ROOT/dist"
-stage="$(mktemp -d "$ROOT/dist/.KeyWeaver-build.XXXXXXXX")"
-destination="$ROOT/dist/KeyWeaver.app"
+stage="$(mktemp -d "$ROOT/dist/.KeyWeave-build.XXXXXXXX")"
+destination="$ROOT/dist/KeyWeave.app"
 cleanup() {
     local result=$?
     trap - EXIT
@@ -73,19 +73,19 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-APP="$stage/KeyWeaver.app"
+APP="$stage/KeyWeave.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-cp "$PRODUCTS/TabType" "$APP/Contents/MacOS/KeyWeaver"
+cp "$PRODUCTS/TabType" "$APP/Contents/MacOS/KeyWeave"
 LLAMA_FW="$(find "$PRODUCTS" -maxdepth 2 -name llama.framework -type d | head -1)"
 [ -n "$LLAMA_FW" ] || fail 'llama.framework is missing; refusing a broken app.'
 cp -R "$LLAMA_FW" "$APP/Contents/Frameworks/"
 if [ "$release" = 1 ]; then
-    if ! otool -l "$APP/Contents/MacOS/KeyWeaver" | grep -F '@executable_path/../Frameworks' >/dev/null; then
-        install_name_tool -add_rpath '@executable_path/../Frameworks' "$APP/Contents/MacOS/KeyWeaver"
+    if ! otool -l "$APP/Contents/MacOS/KeyWeave" | grep -F '@executable_path/../Frameworks' >/dev/null; then
+        install_name_tool -add_rpath '@executable_path/../Frameworks' "$APP/Contents/MacOS/KeyWeave"
     fi
-    lipo "$APP/Contents/MacOS/KeyWeaver" -verify_arch arm64
+    lipo "$APP/Contents/MacOS/KeyWeave" -verify_arch arm64
 else
-    install_name_tool -add_rpath '@executable_path/../Frameworks' "$APP/Contents/MacOS/KeyWeaver" 2>/dev/null || true
+    install_name_tool -add_rpath '@executable_path/../Frameworks' "$APP/Contents/MacOS/KeyWeave" 2>/dev/null || true
 fi
 find "$PRODUCTS" -maxdepth 1 -name '*.bundle' -exec cp -R {} "$APP/Contents/Resources/" \;
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
@@ -94,12 +94,12 @@ if [ -f "$ROOT/LICENSE" ]; then cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICE
 if [ "$release" = 1 ]; then
     [ -f "$APP/Contents/Resources/LICENSE" ] || fail 'MIT LICENSE is missing.'
     [ "$(plutil -extract CFBundleIdentifier raw -o - "$APP/Contents/Info.plist")" = dev.anuhas.keyweave ] || fail 'Unexpected release bundle identifier.'
-    [ "$(plutil -extract CFBundleExecutable raw -o - "$APP/Contents/Info.plist")" = KeyWeaver ] || fail 'Unexpected release executable.'
+    [ "$(plutil -extract CFBundleExecutable raw -o - "$APP/Contents/Info.plist")" = KeyWeave ] || fail 'Unexpected release executable.'
     # Refuse new nested code until its signing order/entitlements are deliberate.
     while IFS= read -r -d '' candidate; do
         if [[ "$(file -b "$candidate")" == *Mach-O* ]]; then
             case "$candidate" in
-                "$APP/Contents/MacOS/KeyWeaver"|"$APP/Contents/Frameworks/llama.framework/llama"|"$APP/Contents/Frameworks/llama.framework/Versions/"*/llama) ;;
+                "$APP/Contents/MacOS/KeyWeave"|"$APP/Contents/Frameworks/llama.framework/llama"|"$APP/Contents/Frameworks/llama.framework/Versions/"*/llama) ;;
                 *) fail "Unexpected nested executable: $candidate" ;;
             esac
         fi

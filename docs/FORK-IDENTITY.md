@@ -15,11 +15,11 @@ The source still builds as TabType. **Do not launch a fork build against real us
 
 ## Intended boundary
 
-Use `Keyweave` as the working display/bundle output name and a distinct application identifier, provisionally `dev.anuhas.keyweave`. Keep internal Swift module names if renaming them creates unnecessary risk. The signer may require a different final identifier; verify it before distribution.
+Use `KeyWeave` as the working display/bundle output name and a distinct application identifier, provisionally `dev.anuhas.keyweave`. Keep internal Swift module names if renaming them creates unnecessary risk. The signer may require a different final identifier; verify it before distribution.
 
 Give the fork its own Application Support, preferences, Keychain service and cloud-sync namespace. Do not silently read, migrate, overwrite, delete or synchronize TabType/Cotypist data. Import, if added later, is explicit and reversible. Models may be large; do not duplicate or move another app's installed weights without permission and license checks.
 
-Disable inherited automatic updates until a Keyweave-owned distribution source and publisher verification exist. Repointing a URL alone is not enough: asset naming, bundle identity, checksum, signing trust and recovery must agree. A new fork with no releases must show a benign no-update state, not install an upstream TabType build.
+Disable inherited automatic updates until a KeyWeave-owned distribution source and publisher verification exist. Repointing a URL alone is not enough: asset naming, bundle identity, checksum, signing trust and recovery must agree. A new fork with no releases must show a benign no-update state, not install an upstream TabType build.
 
 Choose whether to pin or own the remote model catalog; do not inherit unreviewed future catalog changes silently. Preserve model-license notices and download verification.
 

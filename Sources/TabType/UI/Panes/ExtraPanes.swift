@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What KeyWeaver is allowed to read for extra context, grouped the way Cotypist's own
+/// What KeyWeave is allowed to read for extra context, grouped the way Cotypist's own
 /// Context pane is (Screenshot Settings / Clipboard Settings) rather than folded into
 /// Personalization.
 struct ContextPane: View {
@@ -117,7 +117,7 @@ struct ShortcutsPane: View {
                 KeyRecorderRow(title: "Word alternatives", binding: $settings.wordAlternativesKey)
                 KeyRecorderRow(title: "Force a suggestion", binding: $settings.forceActivateKey)
                 KeyRecorderRow(title: "Pause in current app (5 min)", binding: $settings.appPauseKey)
-                KeyRecorderRow(title: "Enable/disable KeyWeaver", binding: $settings.toggleKey, allowNone: true)
+                KeyRecorderRow(title: "Enable/disable KeyWeave", binding: $settings.toggleKey, allowNone: true)
                 Text("Hold ⌥ with the accept key to send the real key to the app (e.g. ⌥Tab moves between form fields while a suggestion is shown).")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -267,7 +267,7 @@ struct PersonalizationPane: View {
             Section("Learn from your writing") {
                 Toggle("Learn from what I write", isOn: $settings.collectTypingHistory)
                     .disabled(!AppSafetyPolicy.writingEnabled)
-                Text("KeyWeaver keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
+                Text("KeyWeave keeps the messages you send and the text you write (passwords, keys and card numbers are removed first) so suggestions can reuse your own phrasing — your sign-offs, names and recurring sentences. Everything is encrypted and stays on your Mac. You can turn this on or off per app in Settings ▸ Apps.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Personalization strength", selection: $settings.personalizationStrength) {
                     Text("Gentle").tag("gentle")
@@ -279,7 +279,7 @@ struct PersonalizationPane: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Record text even when you accept no suggestion", isOn: $settings.recordWithoutAccepts)
                     .disabled(!AppSafetyPolicy.writingEnabled)
-                Text("Off: KeyWeaver only learns from messages where you used at least one suggestion.")
+                Text("Off: KeyWeave only learns from messages where you used at least one suggestion.")
                     .font(.caption).foregroundStyle(.secondary)
                 LearnedWritingRow()
             }
@@ -400,7 +400,7 @@ struct UpdatesSection: View {
     var body: some View {
         Section("Updates") {
             LabeledContent("Version", value: updater.currentVersion)
-            Text("Download updates from the KeyWeaver GitHub releases page. Automatic installation is disabled.")
+            Text("Download updates from the KeyWeave GitHub releases page. Automatic installation is disabled.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -418,7 +418,7 @@ struct AboutPane: View {
                                 .frame(width: 48, height: 48)
                         }
                         VStack(alignment: .leading) {
-                            Text("KeyWeaver").font(.title2).bold()
+                            Text("KeyWeave").font(.title2).bold()
                             Text("Open-source, on-device autocomplete for macOS.")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
@@ -435,7 +435,7 @@ struct AboutPane: View {
                       systemImage: "key.slash")
             }
             Section("Open source") {
-                Text("KeyWeaver is an MIT-licensed fork of TabType. Upstream copyright and third-party acknowledgments are preserved.")
+                Text("KeyWeave is an MIT-licensed fork of TabType. Upstream copyright and third-party acknowledgments are preserved.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Section("Third-party acknowledgments") {
@@ -463,7 +463,7 @@ struct AboutPane: View {
 }
 
 
-/// How much writing KeyWeaver has learned from, with an erase button.
+/// How much writing KeyWeave has learned from, with an erase button.
 private struct LearnedWritingRow: View {
     @ObservedObject private var store = WritingStore.shared
     @State private var confirming = false
@@ -478,7 +478,7 @@ private struct LearnedWritingRow: View {
             Button("Erase…", role: .destructive) { confirming = true }
                 .disabled(store.documentCount == 0)
         }
-        .confirmationDialog("Erase everything KeyWeaver learned from your writing?", isPresented: $confirming) {
+        .confirmationDialog("Erase everything KeyWeave learned from your writing?", isPresented: $confirming) {
             Button("Erase", role: .destructive) { store.eraseAll() }
         }
     }

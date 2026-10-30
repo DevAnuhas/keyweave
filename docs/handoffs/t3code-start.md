@@ -1,6 +1,6 @@
-# Start Keyweave in t3code
+# Start KeyWeave in t3code
 
-Work on https://github.com/DevAnuhas/keyweave on my Mac. Keyweave is the working name of our public TabType fork. Start from the currently available `main` branch, inspect open PRs and preserve unrelated work. Read any repository guidance that exists; do not depend on an unpublished bootstrap branch.
+Work on https://github.com/DevAnuhas/keyweave on my Mac. KeyWeave is the working name of our public TabType fork. Start from the currently available `main` branch, inspect open PRs and preserve unrelated work. Read any repository guidance that exists; do not depend on an unpublished bootstrap branch.
 
 Goal: independently implement the complete useful feature set of current Cotypist, including Pro/Labs, and close verified quality/compatibility gaps. Research before implementation.
 
@@ -14,7 +14,7 @@ Goal: independently implement the complete useful feature set of current Cotypis
 
 5. Build an evidence-backed parity matrix: official claim/version, observed Cotypist behavior, inherited source path, observed fork behavior, present/partial/missing/unverified status, acceptance test and evidence. Use synthetic writing. Reproduce real behavior and use REA for focused unresolved mechanisms, not an indiscriminate application dump. Never invent results or equate compilation with parity.
 
-6. Propose small, test-first implementation slices. The first code slice must isolate Keyweave's bundle/signing identity, updater, Application Support, preferences, Keychain and iCloud namespace before launching the fork. It must not overwrite TabType/Cotypist data or install upstream TabType updates. Audit rich-text compatibility, caret/font placement, focus/selection races, context freshness, language/model cases, personalization, alternatives, synonyms, sync and lifecycle/performance.
+6. Propose small, test-first implementation slices. The first code slice must isolate KeyWeave's bundle/signing identity, updater, Application Support, preferences, Keychain and iCloud namespace before launching the fork. It must not overwrite TabType/Cotypist data or install upstream TabType updates. Audit rich-text compatibility, caret/font placement, focus/selection races, context freshness, language/model cases, personalization, alternatives, synonyms, sync and lifecycle/performance.
 
 Keep vendor binaries, pseudocode, extracted proprietary prompts/assets/weights, personal writing, raw captures and credentials out of this public repo. Publish only sanitized findings, independently written behavior specs/code and synthetic fixtures. Preserve MIT/third-party notices. REA runs locally, but this agent's model provider may receive tool output; do not expose personal text.
 

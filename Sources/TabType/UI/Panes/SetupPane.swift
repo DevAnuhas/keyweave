@@ -24,7 +24,7 @@ struct SetupPane: View {
                         .foregroundStyle(allSet ? .green : .secondary)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(allSet ? "All set!" : "Finish setup").font(.headline)
-                        Text(allSet ? "KeyWeaver is ready to use. Start typing in a supported text field and press Tab to accept a suggestion." : "Complete the steps below to start getting suggestions.")
+                        Text(allSet ? "KeyWeave is ready to use. Start typing in a supported text field and press Tab to accept a suggestion." : "Complete the steps below to start getting suggestions.")
                             .font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -36,14 +36,14 @@ struct SetupPane: View {
             Section {
                 statusRow(
                     ok: !AppSafetyPolicy.inputMonitoringEnabled || trusted, title: "Accessibility permission",
-                    detail: AppSafetyPolicy.inputMonitoringEnabled ? "Required — lets KeyWeaver read the field you're typing in and insert completions." : "Required to start suggestions.",
+                    detail: AppSafetyPolicy.inputMonitoringEnabled ? "Required — lets KeyWeave read the field you're typing in and insert completions." : "Required to start suggestions.",
                     action: (!AppSafetyPolicy.inputMonitoringEnabled || trusted ? nil : ("Grant", { _ = AccessibilityBridge.requestTrust() })),
                     doneLabel: AppSafetyPolicy.inputMonitoringEnabled ? "Granted" : "Not needed")
 
                 statusRow(
                     ok: settings.inputMonitoringState == .active, title: "Keyboard monitoring",
                     detail: settings.inputMonitoringState == .failed
-                        ? "Could not start. Check System Settings → Privacy & Security → Input Monitoring. KeyWeaver retries automatically."
+                        ? "Could not start. Check System Settings → Privacy & Security → Input Monitoring. KeyWeave retries automatically."
                         : "Starts after Accessibility is granted. Suggestions can be paused from the menu bar.",
                     action: nil,
                     doneLabel: settings.inputMonitoringState == .active ? "Running" : "Not running")
@@ -56,14 +56,14 @@ struct SetupPane: View {
 
                 modelRow
 
-                Text("Manage macOS text suggestions in System Settings. KeyWeaver does not change that preference.")
+                Text("Manage macOS text suggestions in System Settings. KeyWeave does not change that preference.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Optional") {
                 Toggle("Use clipboard as context", isOn: $settings.useClipboardContext)
                     .disabled(!AppSafetyPolicy.clipboardContextEnabled)
-                Text("When on, KeyWeaver reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
+                Text("When on, KeyWeave reads your clipboard to better understand what you're working on. Processed locally; never stored or sent anywhere. (Free — no upgrade required.)")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

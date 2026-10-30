@@ -1,5 +1,5 @@
-// Adapted from Yeelight Station, copyright (c) 2026 DevAnuhas.
-// MIT license retained at packaging/dmg/YEELIGHT-LICENSE.txt.
+// Copyright (c) 2026 DevAnuhas.
+// MIT license: packaging/dmg/LICENSE.txt.
 // Offscreen, deterministic on a given macOS/font version; no app or Finder UI.
 // swift scripts/make-dmg-background.swift packaging/dmg
 import AppKit
@@ -27,9 +27,9 @@ for scale in [1, 2] {
             withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: weight),
                              .foregroundColor: color])
     }
-    text("KeyWeaver", x: 36, top: 30, size: 26, weight: .semibold,
+    text("KeyWeave", x: 36, top: 30, size: 26, weight: .semibold,
          color: NSColor(srgbRed: 0.13, green: 0.15, blue: 0.19, alpha: 1))
-    text("Drag KeyWeaver into Applications to install.", x: 36, top: 70, size: 14,
+    text("Drag KeyWeave into Applications to install.", x: 36, top: 70, size: 14,
          color: NSColor(srgbRed: 0.36, green: 0.39, blue: 0.43, alpha: 1))
     let arrow = NSBezierPath()
     arrow.move(to: NSPoint(x: 274, y: 220))
