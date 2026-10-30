@@ -1,3 +1,24 @@
+# Keyweave
+
+A working-name fork of [TabType](https://github.com/nilava/TabType), focused on verified Cotypist feature parity, macOS compatibility and reliable local autocomplete. Free and MIT-licensed; upstream attribution remains intact.
+
+**Status: bootstrap/research. There is no Keyweave app release yet.** The inherited source still builds and identifies itself as TabType. Do not run it against real user data before completing the identity, storage and updater isolation below.
+
+Start here:
+- [Project context and exact upstream baseline](CONTEXT.md)
+- [Working rules](AGENTS.md)
+- [Milestone and Mac acceptance](docs/MILESTONE.md)
+- [First code slice: fork identity and update ownership](docs/FORK-IDENTITY.md)
+- [Research sources](docs/research/README.md)
+- [REA investigation workflow](docs/REA-WORKFLOW.md)
+- [t3code starter prompt](docs/handoffs/t3code-start.md)
+- [Cotypist release-history coverage and gaps](docs/research/COTYPIST-HISTORY.md)
+- [Branch and review conventions](docs/WORKFLOW.md)
+
+## Inherited upstream README
+
+The original documentation below is retained as a reference and attribution. Its product promises, author statements, screenshots, install/update links and signing instructions describe upstream TabType, not a tested Keyweave release. Fork-specific guidance above takes precedence.
+
 <div align="center">
 
 # ⌨️ TabType
