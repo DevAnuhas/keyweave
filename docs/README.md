@@ -1,7 +1,8 @@
 # Project documentation
 
-- [KeyWeaver preview verification](implementation/keyweaver-preview.md): artwork, signed/notarized artifacts, test results, hashes and remaining limits.
+- [KeyWeaver 2.2.0 verification](implementation/keyweaver-2.2.0.md): restored core startup, model-backed tests, normal release versioning and distribution acceptance status.
 - [KeyWeaver release runbook](runbooks/releasing.md): fail-closed Developer ID signing, notarization, packaging and verification.
+- [Withdrawn isolation-preview evidence](implementation/keyweaver-preview.md): historical artwork/distribution checks for the removed 0.1.0 build; not current capability evidence.
 
 - [AX-context fallback](implementation/ax-context-fallback.md): first correctness slice after Gate 0; source-selection contract, synthetic tests and live-acquisition limits.
 - [Gate 0 isolation and verification](implementation/gate0-isolation.md): merged isolation boundary, native checks, first-launch evidence and remaining limits.

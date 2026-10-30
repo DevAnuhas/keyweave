@@ -224,7 +224,7 @@ if args[:2]==["-m","venv"]:
             (app / relative).mkdir(parents=True)
         (app / "Contents/Info.plist").write_bytes(plistlib.dumps({
             "CFBundleIdentifier": "dev.anuhas.keyweave", "CFBundleExecutable": "KeyWeaver",
-            "CFBundleShortVersionString": "0.1.0"
+            "CFBundleShortVersionString": "2.2.0"
         }))
         (app / "Contents/MacOS/KeyWeaver").write_bytes(b"synthetic signed executable")
         (app / "Contents/Resources/AppIcon.icns").write_bytes(b"synthetic volume icon")
@@ -301,12 +301,12 @@ elif args[0]=="detach":
         detaches = [call["args"][1] for call in calls if call["tool"] == "hdiutil" and call["args"][0] == "detach"]
         self.assertIn("/dev/disk999", detaches)
         self.assertNotIn("/dev/disk888", detaches)
-        self.assertEqual((self.root / "dist/KeyWeaver-0.1.0-arm64.dmg").read_bytes(), b"synthetic dmgbuild image")
-        self.assertFalse((self.root / "dist/KeyWeaver-0.1.0-arm64.dmg.lock").exists())
+        self.assertEqual((self.root / "dist/KeyWeaver-2.2.0-arm64.dmg").read_bytes(), b"synthetic dmgbuild image")
+        self.assertFalse((self.root / "dist/KeyWeaver-2.2.0-arm64.dmg.lock").exists())
 
     def test_existing_dmg_is_never_overwritten(self):
         _, environment = self.make_dmg_fixture()
-        image = self.root / "dist/KeyWeaver-0.1.0-arm64.dmg"
+        image = self.root / "dist/KeyWeaver-2.2.0-arm64.dmg"
         image.write_bytes(b"existing accepted image")
         result = self.run_script("package.sh", environment)
         self.assertNotEqual(result.returncode, 0)
@@ -317,9 +317,9 @@ elif args[0]=="detach":
 
     def test_final_verification_mounts_only_a_private_copy_and_detaches_it(self):
         app, environment = self.make_dmg_fixture()
-        image = self.root / "dist/KeyWeaver-0.1.0-arm64.dmg"
+        image = self.root / "dist/KeyWeaver-2.2.0-arm64.dmg"
         image.write_bytes(b"synthetic accepted image")
-        archive = self.root / "dist/KeyWeaver-0.1.0-arm64.zip"
+        archive = self.root / "dist/KeyWeaver-2.2.0-arm64.zip"
         with zipfile.ZipFile(archive, "w") as packaged:
             for path in app.rglob("*"):
                 if path.is_file(): packaged.write(path, str(path.relative_to(app.parent)))

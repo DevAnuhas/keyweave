@@ -4,11 +4,13 @@
 
 An open-source, on-device macOS writing assistant, built from [TabType](https://github.com/nilava/TabType). The application code is MIT-licensed, with upstream attribution preserved. Bundled runtime, fonts, emoji and dictionary data retain their own included notices and licenses.
 
-**0.1.0 is an isolation and interface preview. Suggestions and input monitoring are disabled.** Screen/clipboard context, writing memory, sync, login registration and automatic app/model updates are also off. No model download or Accessibility/Screen Recording permission is needed to inspect the preview. This is not a Cotypist-parity release or a working daily autocomplete build.
+**KeyWeaver 2.2.0 continues the TabType 2.1.0 version line.** It restores core on-device autocomplete within KeyWeaver's isolated namespaces: opening the app shows Setup, reopening returns to Settings, and input monitoring starts after Accessibility permission is granted. A selected model already installed for KeyWeaver loads at startup. Missing models require an explicit Download action; startup does not download or resume transfers.
 
-[Download the preview](https://github.com/DevAnuhas/keyweave/releases/tag/v0.1.0-preview.1) · [Release checks and packaging](docs/runbooks/releasing.md) · [Implementation evidence](docs/README.md)
+[Download the latest release](https://github.com/DevAnuhas/keyweave/releases/latest) · [2.2.0 verification status](docs/implementation/keyweaver-2.2.0.md) · [Release checks and packaging](docs/runbooks/releasing.md)
 
-Requires Apple Silicon and macOS 14 or later. Download the arm64 DMG or ZIP, check `SHA256SUMS.txt`, and drag `KeyWeaver.app` into Applications. Model files are not included. Existing TabType/Cotypist stores are never automatically imported or migrated.
+Requires Apple Silicon and macOS 14 or later. Download the arm64 DMG or ZIP, check `SHA256SUMS.txt`, drag `KeyWeaver.app` into Applications and open it. In Setup, grant KeyWeaver its own Accessibility permission and choose/download a local model. Suggestions require the input monitor to be active and the model to be ready. Model files are not bundled; existing TabType/Cotypist stores and models are never automatically imported or migrated.
+
+Screen/clipboard context, writing memory, sync, login registration and automatic updates remain disabled while their consent and compatibility work is completed. Screen Recording is not required for basic completion in the focused text field. The withdrawn `0.1.0` isolation build is [historical evidence](docs/implementation/keyweaver-preview.md), not the current app. Cotypist feature parity and broad host compatibility remain unverified.
 
 ## Identity and artwork
 
