@@ -126,8 +126,10 @@ struct GeneralSettingsView: View {
                     get: { AppSafetyPolicy.inputMonitoringEnabled && settings.isEnabled },
                     set: { settings.isEnabled = $0 }))
                     .disabled(!AppSafetyPolicy.inputMonitoringEnabled)
-                Text("Input monitoring is off in this build.")
-                    .font(.caption).foregroundStyle(.secondary)
+                if !AppSafetyPolicy.inputMonitoringEnabled {
+                    Text("Input monitoring is off in this build.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle("Launch KeyWeaver at login", isOn: $launchAtLogin)
                     .disabled(!AppSafetyPolicy.launchAtLoginEnabled)
                     .onChange(of: launchAtLogin) { _, on in LaunchAtLogin.set(on) }

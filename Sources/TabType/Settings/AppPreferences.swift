@@ -39,7 +39,10 @@ private final class DomainPreferences: UserDefaults, @unchecked Sendable {
 
     init(domain: String) {
         self.domain = domain
-        super.init(suiteName: domain)!
+        // Foundation rejects the process's own bundle ID as a named suite.
+        // Its default store already writes to that domain; reads below still
+        // use only our explicit domain, without argument/global fallbacks.
+        super.init(suiteName: domain == Bundle.main.bundleIdentifier ? nil : domain)!
     }
 
     override func object(forKey key: String) -> Any? { persistentDomain(forName: domain)?[key] }
