@@ -82,7 +82,7 @@ def main():
             raise RuntimeError("Expected an .app directory")
         with (artifact / "Contents/Info.plist").open("rb") as stream:
             plist = plistlib.load(stream)
-        if plist.get("CFBundleIdentifier") != "dev.anuhas.keyweave" or plist.get("CFBundleExecutable") != "KeyWeaver":
+        if plist.get("CFBundleIdentifier") != "dev.anuhas.keyweave" or plist.get("CFBundleExecutable") != "KeyWeave":
             raise RuntimeError("Unexpected application identity")
         version = plist.get("CFBundleShortVersionString", "")
         if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}", version):
@@ -90,7 +90,7 @@ def main():
     elif not artifact.is_file() or artifact.suffix != ".dmg":
         raise RuntimeError("Expected a regular .dmg file")
     cdhash, details = signature(artifact, args.kind, team)
-    parent = Path(os.environ.get("NOTARY_RECEIPTS_DIR", str(Path.home() / "Library/Application Support/KeyWeaverReleaseReceipts")))
+    parent = Path(os.environ.get("NOTARY_RECEIPTS_DIR", str(Path.home() / "Library/Application Support/KeyWeave-ReleaseReceipts")))
     outside_repository(parent)
     if args.resume:
         if args.resume.is_symlink() or not args.resume.is_dir():
@@ -168,10 +168,10 @@ def main():
         run(["xcrun", "stapler", "validate", artifact], attempt, "ticket")
         signature(artifact, "app", team)
         run(["spctl", "--assess", "--type", "execute", "--verbose=4", artifact], attempt, "gatekeeper")
-        destination = artifact.parent / f"KeyWeaver-{version}-arm64.zip"
+        destination = artifact.parent / f"KeyWeave-{version}-arm64.zip"
         if destination.is_symlink():
             raise RuntimeError("Refusing a symlink at the ZIP destination")
-        with tempfile.TemporaryDirectory(prefix=".KeyWeaver-zip-", dir=artifact.parent) as directory:
+        with tempfile.TemporaryDirectory(prefix=".KeyWeave-zip-", dir=artifact.parent) as directory:
             packaged = Path(directory) / "distribution.zip"
             run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", artifact, packaged], attempt, "stapled-zip")
             with zipfile.ZipFile(packaged, "a", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -179,7 +179,7 @@ def main():
             os.replace(packaged, destination)
         (receipt / "distribution.sha256").write_text(digest(destination) + "\n")
     else:
-        with tempfile.TemporaryDirectory(prefix=".KeyWeaver-dmg-", dir=artifact.parent) as directory:
+        with tempfile.TemporaryDirectory(prefix=".KeyWeave-dmg-", dir=artifact.parent) as directory:
             packaged = Path(directory) / "distribution.dmg"
             shutil.copy2(upload, packaged)
             run(["xcrun", "stapler", "staple", packaged], attempt, "staple")

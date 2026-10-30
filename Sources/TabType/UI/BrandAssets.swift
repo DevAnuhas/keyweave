@@ -18,7 +18,7 @@ enum BrandAssets {
     }
 
     static func appIcon() -> NSImage? {
-        guard let url = Bundle.module.url(forResource: "KeyWeaverIcon", withExtension: "png", subdirectory: "Branding") else { return nil }
+        guard let url = Bundle.module.url(forResource: "KeyWeaveIcon", withExtension: "png", subdirectory: "Branding") else { return nil }
         return NSImage(contentsOf: url)
     }
 }

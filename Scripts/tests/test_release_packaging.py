@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ReleasePackagingTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="keyweaver-release-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="keyweave-release-test-")
         self.root = Path(self.temporary.name) / "repo"
         self.root.mkdir()
         (self.root / "Scripts").mkdir()
@@ -77,7 +77,7 @@ class ReleasePackagingTests(unittest.TestCase):
         resources = self.root / "Resources"
         resources.mkdir()
         (resources / "Info.plist").write_bytes(plistlib.dumps({
-            "CFBundleIdentifier": "dev.anuhas.keyweave", "CFBundleExecutable": "KeyWeaver"
+            "CFBundleIdentifier": "dev.anuhas.keyweave", "CFBundleExecutable": "KeyWeave"
         }))
         (resources / "TabType.entitlements").write_bytes(plistlib.dumps({}))
         (self.root / "LICENSE").write_text("Synthetic MIT notice")
@@ -108,7 +108,7 @@ if sys.argv[1]=="-d":
         signs = [arguments for arguments in calls if arguments[0] == "--force"]
         self.assertEqual(len(signs), 2)
         self.assertTrue(signs[0][-1].endswith("/Contents/Frameworks/llama.framework"))
-        self.assertTrue(signs[1][-1].endswith("/KeyWeaver.app"))
+        self.assertTrue(signs[1][-1].endswith("/KeyWeave.app"))
         for arguments in signs:
             self.assertIn("--timestamp", arguments)
             self.assertIn("--options", arguments)
@@ -116,10 +116,10 @@ if sys.argv[1]=="-d":
             self.assertNotIn("--deep", arguments)
         self.assertNotIn("--entitlements", signs[0])
         self.assertIn("--entitlements", signs[1])
-        self.assertTrue((self.root / "dist/KeyWeaver.app/Contents/MacOS/KeyWeaver").is_file())
+        self.assertTrue((self.root / "dist/KeyWeave.app/Contents/MacOS/KeyWeave").is_file())
 
     def test_notary_without_profile_never_invokes_platform_tools(self):
-        result = subprocess.run(["python3", str(self.script("notarize.py")), "app", str(self.root / "KeyWeaver.app")],
+        result = subprocess.run(["python3", str(self.script("notarize.py")), "app", str(self.root / "KeyWeave.app")],
                                 env=self.environment, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("KEYCHAIN_PROFILE", result.stderr)
@@ -157,28 +157,28 @@ if sys.argv[1]=="-d":
         self.assertFalse(self.calls.exists())
         self.assertEqual(artifact.read_bytes(), b"synthetic disk image, never mount")
 
-    def test_dmgbuild_layout_matches_the_station_creation_method(self):
-        app = self.root / "KeyWeaver.app"
+    def test_dmgbuild_layout(self):
+        app = self.root / "KeyWeave.app"
         resources = self.root / "artwork"
         license_file = self.root / "LICENSE"
         settings = runpy.run_path(str(ROOT / "packaging/dmg/settings.py"), init_globals={
             "defines": {"app": str(app), "resources": str(resources), "license": str(license_file)}
         })
-        self.assertEqual(settings["files"], [(str(app), "KeyWeaver.app"), (str(license_file), "License.txt")])
+        self.assertEqual(settings["files"], [(str(app), "KeyWeave.app"), (str(license_file), "License.txt")])
         self.assertEqual(settings["symlinks"], {"Applications": "/Applications"})
         self.assertEqual(settings["filesystem"], "HFS+")
         self.assertEqual(settings["format"], "UDZO")
         self.assertEqual(settings["icon"], str(app / "Contents/Resources/AppIcon.icns"))
         self.assertEqual(settings["background"], str(resources / "background.png"))
         self.assertEqual(settings["window_rect"], ((180, 180), (600, 500)))
-        self.assertEqual(settings["icon_locations"], {"KeyWeaver.app": (150, 180), "Applications": (450, 180), "License.txt": (520, 320)})
+        self.assertEqual(settings["icon_locations"], {"KeyWeave.app": (150, 180), "Applications": (450, 180), "License.txt": (520, 320)})
         self.assertEqual(settings["icon_size"], 80)
         self.assertEqual(settings["text_size"], 13)
         self.assertFalse(settings["show_status_bar"])
         self.assertFalse(settings["show_toolbar"])
         self.assertNotIn("hide_extensions", settings, "Never apply FinderInfo extension flags to the signed app")
 
-    def test_dmgbuild_dependencies_match_the_station_hash_pins(self):
+    def test_dmgbuild_dependencies_are_hash_pinned(self):
         lines = [line for line in (ROOT / "packaging/dmg/requirements.txt").read_text().splitlines()
                  if line and not line.startswith("#")]
         self.assertEqual(lines, [
@@ -219,14 +219,14 @@ if args[:2]==["-m","venv"]:
             self.assertIn(value, checks[0])
 
     def make_dmg_fixture(self):
-        app = self.root / "dist/KeyWeaver.app"
+        app = self.root / "dist/KeyWeave.app"
         for relative in ["Contents/MacOS", "Contents/Resources", "Contents/_CodeSignature"]:
             (app / relative).mkdir(parents=True)
         (app / "Contents/Info.plist").write_bytes(plistlib.dumps({
-            "CFBundleIdentifier": "dev.anuhas.keyweave", "CFBundleExecutable": "KeyWeaver",
+            "CFBundleIdentifier": "dev.anuhas.keyweave", "CFBundleExecutable": "KeyWeave",
             "CFBundleShortVersionString": "2.2.0"
         }))
-        (app / "Contents/MacOS/KeyWeaver").write_bytes(b"synthetic signed executable")
+        (app / "Contents/MacOS/KeyWeave").write_bytes(b"synthetic signed executable")
         (app / "Contents/Resources/AppIcon.icns").write_bytes(b"synthetic volume icon")
         (app / "Contents/_CodeSignature/CodeResources").write_bytes(b"synthetic resource seal")
         (self.root / "LICENSE").write_bytes(b"synthetic MIT license")
@@ -258,7 +258,7 @@ for index,value in enumerate(args):
   key,item=args[index+1].split("=",1);values[key]=item
 payload=pathlib.Path(os.environ["KEYWEAVE_TEST_PAYLOAD"])
 payload.mkdir()
-shutil.copytree(values["app"],payload/"KeyWeaver.app")
+shutil.copytree(values["app"],payload/"KeyWeave.app")
 shutil.copyfile(values["license"],payload/"License.txt")
 (payload/"Applications").symlink_to("/Applications")
 pathlib.Path(args[-1]).write_bytes(b"synthetic dmgbuild image")
@@ -301,12 +301,12 @@ elif args[0]=="detach":
         detaches = [call["args"][1] for call in calls if call["tool"] == "hdiutil" and call["args"][0] == "detach"]
         self.assertIn("/dev/disk999", detaches)
         self.assertNotIn("/dev/disk888", detaches)
-        self.assertEqual((self.root / "dist/KeyWeaver-2.2.0-arm64.dmg").read_bytes(), b"synthetic dmgbuild image")
-        self.assertFalse((self.root / "dist/KeyWeaver-2.2.0-arm64.dmg.lock").exists())
+        self.assertEqual((self.root / "dist/KeyWeave-2.2.0-arm64.dmg").read_bytes(), b"synthetic dmgbuild image")
+        self.assertFalse((self.root / "dist/KeyWeave-2.2.0-arm64.dmg.lock").exists())
 
     def test_existing_dmg_is_never_overwritten(self):
         _, environment = self.make_dmg_fixture()
-        image = self.root / "dist/KeyWeaver-2.2.0-arm64.dmg"
+        image = self.root / "dist/KeyWeave-2.2.0-arm64.dmg"
         image.write_bytes(b"existing accepted image")
         result = self.run_script("package.sh", environment)
         self.assertNotEqual(result.returncode, 0)
@@ -317,16 +317,16 @@ elif args[0]=="detach":
 
     def test_final_verification_mounts_only_a_private_copy_and_detaches_it(self):
         app, environment = self.make_dmg_fixture()
-        image = self.root / "dist/KeyWeaver-2.2.0-arm64.dmg"
+        image = self.root / "dist/KeyWeave-2.2.0-arm64.dmg"
         image.write_bytes(b"synthetic accepted image")
-        archive = self.root / "dist/KeyWeaver-2.2.0-arm64.zip"
+        archive = self.root / "dist/KeyWeave-2.2.0-arm64.zip"
         with zipfile.ZipFile(archive, "w") as packaged:
             for path in app.rglob("*"):
                 if path.is_file(): packaged.write(path, str(path.relative_to(app.parent)))
             packaged.write(self.root / "LICENSE", "LICENSE")
         payload = Path(environment["KEYWEAVE_TEST_PAYLOAD"])
         payload.mkdir()
-        shutil.copytree(app, payload / "KeyWeaver.app")
+        shutil.copytree(app, payload / "KeyWeave.app")
         shutil.copyfile(self.root / "LICENSE", payload / "License.txt")
         (payload / "Applications").symlink_to("/Applications")
         script = self.script("package.sh")
@@ -338,11 +338,11 @@ elif args[0]=="detach":
         self.assertEqual(len(attaches), 1)
         attached_image = next(value for value in attaches[0] if value.endswith(".dmg"))
         self.assertNotEqual(Path(attached_image), image)
-        self.assertIn(".KeyWeaver-package.", attached_image)
+        self.assertIn(".KeyWeave-package.", attached_image)
         self.assertFalse(json.loads(Path(environment["KEYWEAVE_TEST_STATE"]).read_text())["attached"])
         self.assertEqual(image.read_bytes(), b"synthetic accepted image")
         self.assertEqual(len((self.root / "dist/SHA256SUMS.txt").read_text().splitlines()), 2)
-        self.assertEqual(list((self.root / "dist").glob(".KeyWeaver-package.*")), [])
+        self.assertEqual(list((self.root / "dist").glob(".KeyWeave-package.*")), [])
 
 
 if __name__ == "__main__":

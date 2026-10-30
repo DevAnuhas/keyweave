@@ -2,7 +2,7 @@
 
 The bundle ID deliberately equals the explicit synthetic preferences domain.
 Only fresh, uniquely named test domains are seeded or removed; no application,
-model, SwiftPM dependency, permission prompt, or real KeyWeaver domain is used.
+model, SwiftPM dependency, permission prompt, or real KeyWeave domain is used.
 """
 import base64
 import os
@@ -112,7 +112,7 @@ struct PreferencesProbe {
 class AppPreferencesBundleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temporary = tempfile.TemporaryDirectory(prefix="keyweaver-preferences-test-")
+        cls.temporary = tempfile.TemporaryDirectory(prefix="keyweave-preferences-test-")
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.root = Path(cls.temporary.name).resolve()
         cls.compiler = shutil.which("swiftc")

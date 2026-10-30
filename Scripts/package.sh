@@ -1,5 +1,5 @@
 #!/bin/bash
-# Package an accepted app with the same pinned dmgbuild method as Yeelight Station.
+# Package the accepted app as a signed dmgbuild disk image.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -27,12 +27,12 @@ if [ "$mode" = build ]; then
 fi
 DIST="$ROOT/dist"
 [ -d "$DIST" ] && [ ! -L "$DIST" ] || fail 'Expected a regular dist directory.'
-APP="$DIST/KeyWeaver.app"
-[ -d "$APP" ] && [ ! -L "$APP" ] || fail 'Expected a regular KeyWeaver.app bundle.'
+APP="$DIST/KeyWeave.app"
+[ -d "$APP" ] && [ ! -L "$APP" ] || fail 'Expected a regular KeyWeave.app bundle.'
 version="$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist")"
 [[ "$version" =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || fail 'Unexpected app version.'
-ZIP="$DIST/KeyWeaver-$version-arm64.zip"
-DMG="$DIST/KeyWeaver-$version-arm64.dmg"
+ZIP="$DIST/KeyWeave-$version-arm64.zip"
+DMG="$DIST/KeyWeave-$version-arm64.dmg"
 if [ "$mode" = build ]; then
     [ ! -e "$DMG" ] && [ ! -L "$DMG" ] || fail 'DMG already exists; verify/resume it rather than overwriting a submitted artifact.'
 fi
@@ -47,13 +47,13 @@ dmg_requirement="=anchor apple generic and identifier \"dev.anuhas.keyweave.dmg\
 verify_app() {
     local candidate="$1"
     [ "$(plutil -extract CFBundleIdentifier raw -o - "$candidate/Contents/Info.plist")" = dev.anuhas.keyweave ] || fail 'Unexpected app bundle identity.'
-    [ "$(plutil -extract CFBundleExecutable raw -o - "$candidate/Contents/Info.plist")" = KeyWeaver ] || fail 'Unexpected app executable.'
+    [ "$(plutil -extract CFBundleExecutable raw -o - "$candidate/Contents/Info.plist")" = KeyWeave ] || fail 'Unexpected app executable.'
     [ "$(plutil -extract CFBundleShortVersionString raw -o - "$candidate/Contents/Info.plist")" = "$version" ] || fail 'App version changed while packaging.'
-    [ -f "$candidate/Contents/Resources/AppIcon.icns" ] || fail 'The KeyWeaver app/volume icon is missing.'
+    [ -f "$candidate/Contents/Resources/AppIcon.icns" ] || fail 'The KeyWeave app/volume icon is missing.'
     codesign --verify --deep --strict --test-requirement "$app_requirement" "$candidate"
     xcrun stapler validate "$candidate"
     spctl --assess --type execute --verbose=4 "$candidate"
-    lipo "$candidate/Contents/MacOS/KeyWeaver" -verify_arch arm64
+    lipo "$candidate/Contents/MacOS/KeyWeave" -verify_arch arm64
 }
 verify_app "$APP"
 lock="$DMG.lock"
@@ -98,9 +98,9 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-stage="$(mktemp -d "$DIST/.KeyWeaver-package.XXXXXXXX")"
+stage="$(mktemp -d "$DIST/.KeyWeave-package.XXXXXXXX")"
 if [ "$mode" = build ]; then
-    app="$stage/KeyWeaver.app"
+    app="$stage/KeyWeave.app"
     ditto "$APP" "$app"
     ditto "$ROOT/LICENSE" "$stage/LICENSE"
     verify_app "$app" > "$stage/app-validation.log" 2>&1
@@ -117,7 +117,7 @@ PY
     # dmgbuild's temporary backing images stay inside this invocation's owned stage.
     TMPDIR="$stage/tmp" "$dmgbuild" -s "$ROOT/packaging/dmg/settings.py" \
         -D "app=$app" -D "resources=$ROOT/packaging/dmg" -D "license=$stage/LICENSE" \
-        "KeyWeaver $version" "$stage/distribution.dmg" > "$stage/dmgbuild.log" 2>&1 || fail "dmgbuild failed; see $stage/dmgbuild.log."
+        "KeyWeave $version" "$stage/distribution.dmg" > "$stage/dmgbuild.log" 2>&1 || fail "dmgbuild failed; see $stage/dmgbuild.log."
     image="$stage/distribution.dmg"
 else
     [ -f "$DMG" ] && [ ! -L "$DMG" ] && [ -f "$ZIP" ] && [ ! -L "$ZIP" ] || fail 'Final ZIP/DMG must be regular files.'
@@ -132,17 +132,17 @@ else
     spctl --assess --type open --context context:primary-signature --verbose=4 "$image"
     mkdir "$stage/archive"
     ditto -x -k "$ZIP" "$stage/archive"
-    verify_app "$stage/archive/KeyWeaver.app"
-    cmp "$APP/Contents/MacOS/KeyWeaver" "$stage/archive/KeyWeaver.app/Contents/MacOS/KeyWeaver"
-    cmp "$APP/Contents/_CodeSignature/CodeResources" "$stage/archive/KeyWeaver.app/Contents/_CodeSignature/CodeResources"
+    verify_app "$stage/archive/KeyWeave.app"
+    cmp "$APP/Contents/MacOS/KeyWeave" "$stage/archive/KeyWeave.app/Contents/MacOS/KeyWeave"
+    cmp "$APP/Contents/_CodeSignature/CodeResources" "$stage/archive/KeyWeave.app/Contents/_CodeSignature/CodeResources"
     cmp "$ROOT/LICENSE" "$stage/archive/LICENSE"
 fi
 hdiutil verify "$image" > "$stage/image-validation.log" 2>&1
 mkdir "$stage/verify"
 hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$stage/verify" -plist "$image" > "$stage/attach.plist" 2> "$stage/attach.stderr"
-verify_app "$stage/verify/KeyWeaver.app" > "$stage/packaged-app-validation.log" 2>&1
-cmp "$APP/Contents/MacOS/KeyWeaver" "$stage/verify/KeyWeaver.app/Contents/MacOS/KeyWeaver"
-cmp "$APP/Contents/_CodeSignature/CodeResources" "$stage/verify/KeyWeaver.app/Contents/_CodeSignature/CodeResources"
+verify_app "$stage/verify/KeyWeave.app" > "$stage/packaged-app-validation.log" 2>&1
+cmp "$APP/Contents/MacOS/KeyWeave" "$stage/verify/KeyWeave.app/Contents/MacOS/KeyWeave"
+cmp "$APP/Contents/_CodeSignature/CodeResources" "$stage/verify/KeyWeave.app/Contents/_CodeSignature/CodeResources"
 cmp "$ROOT/LICENSE" "$stage/verify/License.txt"
 [ "$(readlink "$stage/verify/Applications")" = /Applications ] || fail 'DMG Applications link is incorrect.'
 cleanup_mounts || fail 'Cannot detach the verification image; refusing to publish.'

@@ -4,7 +4,7 @@ import TabTypeKit
 
 final class ProductIdentityTests: XCTestCase {
     func testAppBundleAndPersistentIdentitiesBelongToKeyweave() throws {
-        XCTAssertEqual(ProductIdentity.name, "KeyWeaver")
+        XCTAssertEqual(ProductIdentity.name, "KeyWeave")
         XCTAssertEqual(ProductIdentity.bundleIdentifier, "dev.anuhas.keyweave")
         XCTAssertEqual(ProductIdentity.preferencesDomain, "dev.anuhas.keyweave")
         XCTAssertEqual(ProductIdentity.keychainService, "dev.anuhas.keyweave.sync")
@@ -127,14 +127,14 @@ final class ProductIdentityTests: XCTestCase {
                                    environment: ["KEYWEAVE_TEST_CALLS": calls.path])
 
         XCTAssertEqual(result.status, 0, result.output)
-        let app = fixture.appendingPathComponent("dist/KeyWeaver.app")
-        let executable = app.appendingPathComponent("Contents/MacOS/KeyWeaver")
+        let app = fixture.appendingPathComponent("dist/KeyWeave.app")
+        let executable = app.appendingPathComponent("Contents/MacOS/KeyWeave")
         XCTAssertTrue(manager.fileExists(atPath: executable.path), result.output)
         if manager.fileExists(atPath: executable.path) {
             XCTAssertEqual(try String(contentsOf: executable, encoding: .utf8), "synthetic executable")
             let data = try Data(contentsOf: app.appendingPathComponent("Contents/Info.plist"))
             let plist = try XCTUnwrap(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
-            XCTAssertEqual(plist["CFBundleExecutable"] as? String, "KeyWeaver")
+            XCTAssertEqual(plist["CFBundleExecutable"] as? String, "KeyWeave")
             XCTAssertEqual(plist["CFBundleIdentifier"] as? String, "dev.anuhas.keyweave")
             XCTAssertEqual(try String(contentsOf: app.appendingPathComponent("Contents/Resources/TabType_TabType.bundle/resource"),
                                       encoding: .utf8), "synthetic resource")

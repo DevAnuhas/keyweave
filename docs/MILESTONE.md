@@ -2,21 +2,21 @@
 
 ## Outcome
 
-Use Keyweave for normal writing on a Mac without losing a required Cotypist capability or damaging existing installations/data. Full parity remains a target until every required journey has evidence. A docs bootstrap, compilation or benchmark on synthetic data alone does not complete this milestone.
+Use KeyWeave for normal writing on a Mac without losing a required Cotypist capability or damaging existing installations/data. Full parity remains a target until every required journey has evidence. A docs bootstrap, compilation or benchmark on synthetic data alone does not complete this milestone.
 
 ## 1. Establish both baselines
 
 - Record the fork commit, installed Cotypist version/build, macOS, chip/RAM, input languages, app versions, model/quantization and enabled settings. Hash the immutable local target snapshot; do not upload it.
 - Read every entry exposed by the official changelog corpus, including changes retained only in the appcast. Record archive boundaries, unavailable older releases, ambiguous dates/builds and any feed disagreement.
 - Deduplicate history into current capabilities and relevant regression scenarios. Every changelog item gets a disposition: current feature, historical fix, superseded behavior, distribution prerequisite, irrelevant to the current target, or unresolved. Historical fixes are not automatically independent new features.
-- Build a feature matrix with columns: capability, official source/version, Cotypist observation, inherited source path, Keyweave observation, status, acceptance test and evidence location. Use present/unverified/partial/missing/external-prerequisite explicitly.
+- Build a feature matrix with columns: capability, official source/version, Cotypist observation, inherited source path, KeyWeave observation, status, acceptance test and evidence location. Use present/unverified/partial/missing/external-prerequisite explicitly.
 - Validate already-present alternatives, synonyms, clipboard, OCR and sync instead of rebuilding them from marketing comparisons.
 
 ## 2. Isolate identity before running the fork
 
 Complete [FORK-IDENTITY.md](FORK-IDENTITY.md), including own update provenance and separate user data. This is the first code slice. Keep internal module paths stable where a display/bundle change suffices.
 
-Pass bar: an installed Keyweave build can coexist with TabType and Cotypist; it does not alter their data, permissions, cloud records or update channels. Report the new permission prompts honestly.
+Pass bar: an installed KeyWeave build can coexist with TabType and Cotypist; it does not alter their data, permissions, cloud records or update channels. Report the new permission prompts honestly.
 
 ## 3. Investigate, specify, implement
 
@@ -24,7 +24,7 @@ Use [REA-WORKFLOW.md](REA-WORKFLOW.md) for tool readiness and the explicitly per
 
 Prioritize after the matrix, with these starting research questions:
 
-- What does Cotypist's rich-text compatibility control change, and where do current Keyweave insertion/rendering workarounds fail?
+- What does Cotypist's rich-text compatibility control change, and where do current KeyWeave insertion/rendering workarounds fail?
 - Which caret/font/wrapping, delayed accessibility, fast typing, selection and focus cases behave differently in native, browser and Electron fields?
 - Where do context freshness, personalization, word alternatives or selected-word/phrase replacement differ in user-visible results?
 - Which model choices, languages, low-memory/battery paths and update/relaunch cases matter for the user's workflows?

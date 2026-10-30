@@ -18,7 +18,7 @@ struct OnboardingView: View {
                     .padding(.top, 4)
             }
 
-            Text("Welcome to KeyWeaver").font(.title).bold()
+            Text("Welcome to KeyWeave").font(.title).bold()
 
             Text("On-device autocomplete for macOS. Grant Accessibility and choose a local model in Settings to start getting suggestions.")
                 .multilineTextAlignment(.center)
@@ -31,11 +31,11 @@ struct OnboardingView: View {
             permissionRow(
                 ok: trusted,
                 title: AppSafetyPolicy.inputMonitoringEnabled ? "Accessibility (required)" : "Accessibility",
-                detail: AppSafetyPolicy.inputMonitoringEnabled ? "Lets KeyWeaver read the field you're typing in and insert accepted suggestions." : "Required for reading the focused field and inserting accepted suggestions.",
+                detail: AppSafetyPolicy.inputMonitoringEnabled ? "Lets KeyWeave read the field you're typing in and insert accepted suggestions." : "Required for reading the focused field and inserting accepted suggestions.",
                 buttonTitle: "Grant Accessibility",
                 action: onGrant)
 
-            Text("KeyWeaver lives in the menu bar. Click its icon to open Settings or pause suggestions.")
+            Text("KeyWeave lives in the menu bar. Click its icon to open Settings or pause suggestions.")
                 .font(.callout).foregroundStyle(.secondary)
 
             Button("Get Started") { onDone() }

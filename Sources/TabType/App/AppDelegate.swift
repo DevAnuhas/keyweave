@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Register bundled fonts so ghost text can match fields that use them.
         Log.shared.info("ghost fonts: \(BundledFonts.families.joined(separator: ", "))")
 
-        // Only an already installed KeyWeaver model loads at startup.
+        // Only an already installed KeyWeave model loads at startup.
         llamaModels.$status
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.rebuildMenu() }
