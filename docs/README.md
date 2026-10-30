@@ -1,6 +1,7 @@
 # Project documentation
 
-- [KeyWeaver 2.2.0 verification](implementation/keyweaver-2.2.0.md): restored core startup, model-backed tests, normal release versioning and distribution acceptance status.
+- [KeyWeaver 2.2.1 launch fix](implementation/keyweaver-2.2.1.md): matching bundle/preferences identity regression and ordinary installed-launch verification.
+- [KeyWeaver 2.2.0 verification](implementation/keyweaver-2.2.0.md): earlier controlled startup/completion evidence and the subsequently discovered ordinary-launch failure.
 - [KeyWeaver release runbook](runbooks/releasing.md): fail-closed Developer ID signing, notarization, packaging and verification.
 - [Withdrawn isolation-preview evidence](implementation/keyweaver-preview.md): historical artwork/distribution checks for the removed 0.1.0 build; not current capability evidence.
 

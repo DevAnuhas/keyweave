@@ -1,5 +1,7 @@
 # KeyWeaver 2.2.0 verification
 
+**Known installed-launch crash; superseded by [2.2.1](keyweaver-2.2.1.md).** The normal installed `2.2.0` app traps while constructing preferences because Foundation rejects its own bundle identifier as a named suite. The synthetic test domains used below differ from the bundle identifier and missed that branch. These historical results remain valid for their controlled conditions; they did not establish ordinary installed-launch readiness.
+
 Version/build: `2.2.0` / `13`, Apple Silicon, macOS 14 or later. Target tag/title: `v2.2.0` / **KeyWeaver 2.2.0**, published as a normal GitHub release marked Latest. This continues inherited TabType `2.1.0`/build `11`; the `0.1.0`/build `12` isolation release and its remote preview tag were withdrawn. Signed build, model-enabled tests, controlled typing and local distribution checks passed as recorded below. GitHub publication and anonymous download checks are recorded in the release notes.
 
 ## Why the previous installation looked broken

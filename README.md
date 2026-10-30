@@ -4,9 +4,9 @@
 
 An open-source, on-device macOS writing assistant, built from [TabType](https://github.com/nilava/TabType). The application code is MIT-licensed, with upstream attribution preserved. Bundled runtime, fonts, emoji and dictionary data retain their own included notices and licenses.
 
-**KeyWeaver 2.2.0 continues the TabType 2.1.0 version line.** It restores core on-device autocomplete within KeyWeaver's isolated namespaces: opening the app shows Setup, reopening returns to Settings, and input monitoring starts after Accessibility permission is granted. A selected model already installed for KeyWeaver loads at startup. Missing models require an explicit Download action; startup does not download or resume transfers.
+**KeyWeaver 2.2.1 continues the TabType 2.1.0 version line.** It fixes a preferences-initialization crash in the ordinary 2.2.0 installed launch. Core on-device autocomplete uses KeyWeaver's isolated namespaces: opening the app shows Setup, reopening returns to Settings, and input monitoring starts after Accessibility permission is granted. A selected model already installed for KeyWeaver loads at startup. Missing models require an explicit Download action; startup does not download or resume transfers.
 
-[Download the latest release](https://github.com/DevAnuhas/keyweave/releases/latest) · [2.2.0 verification status](docs/implementation/keyweaver-2.2.0.md) · [Release checks and packaging](docs/runbooks/releasing.md)
+[Download the latest release](https://github.com/DevAnuhas/keyweave/releases/latest) · [2.2.1 launch-fix verification](docs/implementation/keyweaver-2.2.1.md) · [Release checks and packaging](docs/runbooks/releasing.md)
 
 Requires Apple Silicon and macOS 14 or later. Download the arm64 DMG or ZIP, check `SHA256SUMS.txt`, drag `KeyWeaver.app` into Applications and open it. In Setup, grant KeyWeaver its own Accessibility permission and choose/download a local model. Suggestions require the input monitor to be active and the model to be ready. Model files are not bundled; existing TabType/Cotypist stores and models are never automatically imported or migrated.
 

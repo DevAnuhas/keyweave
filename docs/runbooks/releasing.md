@@ -1,6 +1,6 @@
 # Releasing KeyWeaver
 
-KeyWeaver is distributed from [DevAnuhas/keyweave](https://github.com/DevAnuhas/keyweave/releases) as an Apple Silicon macOS app. Version `2.2.0` continues the inherited TabType `2.1.0` version line. Internal Swift module names and persistent `dev.anuhas.keyweave` namespaces remain stable. Release acceptance requires working setup/reopening and permission-aware local completion, not just a successful signature or build. Optional screen/clipboard context, writing history and sync must remain off until their explicit consent controls and behavior are verified. Signing and notarization do not establish Cotypist parity.
+KeyWeaver is distributed from [DevAnuhas/keyweave](https://github.com/DevAnuhas/keyweave/releases) as an Apple Silicon macOS app. Version `2.2.1` fixes the `2.2.0` installed-launch crash and continues the inherited TabType `2.1.0` version line. Internal Swift module names and persistent `dev.anuhas.keyweave` namespaces remain stable. Release acceptance requires working setup/reopening and permission-aware local completion, not just a successful signature or build. Optional screen/clipboard context, writing history and sync must remain off until their explicit consent controls and behavior are verified. Signing and notarization do not establish Cotypist parity.
 
 ## Prerequisites
 
@@ -29,17 +29,18 @@ export SIGN_IDENTITY=<Developer-ID-certificate-fingerprint>
 export DEVELOPMENT_TEAM=<expected-team-id>
 export KEYCHAIN_PROFILE=<existing-notarytool-profile-name>
 Scripts/test.sh
+python3 Scripts/tests/test_app_preferences.py -v
 python3 Scripts/tests/test_release_packaging.py -v
 # Once only, unless DMGBUILD_VENV already selects the pinned tooling:
 Scripts/setup-dmg.sh
 RELEASE=1 CONFIG=Release Scripts/build.sh app
 Scripts/notarize.sh app dist/KeyWeaver.app
 Scripts/package.sh
-Scripts/notarize.sh dmg dist/KeyWeaver-2.2.0-arm64.dmg
+Scripts/notarize.sh dmg dist/KeyWeaver-2.2.1-arm64.dmg
 Scripts/package.sh --verify
 ```
 
-Use the version in `Resources/Info.plist` in the asset paths. `2.2.0` uses build `13`, after inherited `2.1.0`/build `11` and the withdrawn isolation build `12`. `Scripts/release.sh` runs those local build/notary/package steps in order when all three configuration variables exist. It never tags, pushes or creates a GitHub release. The app build signs `llama.framework` and then the app explicitly, inside-out, with Hardened Runtime and secure timestamps. Release identity/configuration failures stop before building. Every release signature must satisfy Apple's Developer ID certificate OID, expected team and isolated bundle identity; no ad-hoc fallback exists in release mode.
+Use the version in `Resources/Info.plist` in the asset paths. `2.2.1` uses build `14`, after `2.2.0`/build `13`, inherited `2.1.0`/build `11` and the withdrawn isolation build `12`. `Scripts/release.sh` runs those local build/notary/package steps in order when all three configuration variables exist. It never tags, pushes or creates a GitHub release. The app build signs `llama.framework` and then the app explicitly, inside-out, with Hardened Runtime and secure timestamps. Release identity/configuration failures stop before building. Every release signature must satisfy Apple's Developer ID certificate OID, expected team and isolated bundle identity; no ad-hoc fallback exists in release mode.
 
 The app must have an **Accepted** notary status and matching authoritative log before stapling. The helper verifies the ticket/signature and Gatekeeper, then recreates `KeyWeaver-<version>-arm64.zip` from the stapled app, with MIT `LICENSE` alongside it. ZIP files cannot themselves be stapled. The dmgbuild DMG contains that app, an Applications link and the same MIT notice named `License.txt`; the container is signed and notarized separately. Final verification mounts the DMG read-only, checks the mounted app and compares its executable/resource seal to the accepted source app. It also extracts and verifies the ZIP. `SHA256SUMS.txt` is written only after both final artifacts pass those checks.
 
@@ -49,7 +50,7 @@ Notary submissions run once. Each private receipt binds the artifact's code-dire
 
 ```sh
 Scripts/notarize.sh app dist/KeyWeaver.app --resume <private-app-receipt>
-Scripts/notarize.sh dmg dist/KeyWeaver-2.2.0-arm64.dmg --resume <private-dmg-receipt>
+Scripts/notarize.sh dmg dist/KeyWeaver-2.2.1-arm64.dmg --resume <private-dmg-receipt>
 ```
 
 Do not rerun the complete release build after a timeout. If upload returned no ID, inspect that receipt and the account's submission history before taking another action. Existing same-signature receipts block automatic reupload, and resumed receipts never submit again. Rejected/Invalid status preserves Apple's log and stops. Changed source artifacts or corrupted preserved submissions fail closed. A failed DMG staple operates on a private copy and leaves the distribution image unchanged.
@@ -58,18 +59,20 @@ Do not rerun the complete release build after a timeout. If upload returned no I
 
 ## Publish and verify
 
-After reviewing the exact source tree, license, native test results, setup/reopen and synthetic completion journeys, signed bundle, Accepted app/DMG receipts, mounted/extracted app checks and final hashes, create an annotated `v2.2.0` release tag on that source commit. Publish a normal GitHub release titled **KeyWeaver 2.2.0**, marked **Latest**, attaching only:
+A synthetic home alone misses matching bundle/preferences-domain failures. The preferences regression must use a bundle ID equal to its disposable domain. Also verify the final installed app through ordinary LaunchServices opening with no `KEYWEAVE_TEST_HOME`/`TABTYPE_*` overrides: it must remain alive, show Setup and reopen Settings after closing. Use only the authorized KeyWeaver installation, inspect no writing, and record the exact executable hash.
 
-- `KeyWeaver-2.2.0-arm64.dmg`
-- `KeyWeaver-2.2.0-arm64.zip`
+After reviewing the exact source tree, license, native test results, setup/reopen and synthetic completion journeys, signed bundle, Accepted app/DMG receipts, mounted/extracted app checks and final hashes, create an annotated `v2.2.1` release tag on that source commit. Publish a normal GitHub release titled **KeyWeaver 2.2.1**, marked **Latest**, attaching only:
+
+- `KeyWeaver-2.2.1-arm64.dmg`
+- `KeyWeaver-2.2.1-arm64.zip`
 - `SHA256SUMS.txt`
 
 ```sh
-gh release create v2.2.0 \
-    dist/KeyWeaver-2.2.0-arm64.dmg \
-    dist/KeyWeaver-2.2.0-arm64.zip dist/SHA256SUMS.txt \
+gh release create v2.2.1 \
+    dist/KeyWeaver-2.2.1-arm64.dmg \
+    dist/KeyWeaver-2.2.1-arm64.zip dist/SHA256SUMS.txt \
     --repo DevAnuhas/keyweave --verify-tag \
-    --title 'KeyWeaver 2.2.0' --prerelease=false --latest=true \
+    --title 'KeyWeaver 2.2.1' --prerelease=false --latest=true \
     --notes-file /private/path/to/release-notes.md
 ```
 
